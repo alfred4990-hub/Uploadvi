@@ -1,0 +1,3016 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>UploadVid</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    input, textarea { user-select: text; -webkit-user-select: text; }
+
+    html, body {
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      background: #000;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: #fff;
+    }
+
+    #app {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      overflow: hidden;
+    }
+
+    /* Top permanent ad bar - 1/6 */
+    #ad-bar-top {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 10%;
+      background: linear-gradient(135deg, #0f3460 0%, #16213e 50%, #1a1a2e 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      z-index: 20;
+      overflow: hidden;
+    }
+
+    #ad-bar-top .ad-content {
+      text-align: center;
+      padding: 4px 12px;
+    }
+
+    #ad-bar-top .ad-label {
+      font-size: 9px;
+      opacity: 0.55;
+      letter-spacing: 0.5px;
+      margin-bottom: 1px;
+    }
+
+    #ad-bar-top .ad-title {
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    #ad-bar-top .ad-sub {
+      font-size: 10px;
+      opacity: 0.8;
+      margin-top: 0;
+    }
+
+    /* Video area - middle 4/6 of screen (between top & bottom ads) */
+    #video-container {
+      position: absolute;
+      top: 10%;
+      left: 0;
+      right: 0;
+      bottom: 10%;
+      background: #000;
+      overflow: hidden;
+    }
+
+    .video-slide {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transform: translateY(30%);
+      transition: 
+        opacity 0.35s cubic-bezier(0.25, 0.8, 0.25, 1),
+        transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+      pointer-events: none;
+      will-change: transform, opacity;
+    }
+
+    .video-slide.active {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+      z-index: 2;
+    }
+
+    .video-slide.leaving-up {
+      opacity: 0;
+      transform: translateY(-40%);
+      z-index: 1;
+    }
+
+    .video-slide.leaving-down {
+      opacity: 0;
+      transform: translateY(40%);
+      z-index: 1;
+    }
+
+    .video-slide.entering-from-bottom {
+      transform: translateY(40%);
+      opacity: 0;
+    }
+
+    .video-slide.entering-from-top {
+      transform: translateY(-40%);
+      opacity: 0;
+    }
+
+    .video-slide video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: #111;
+      /* Prevent native enlarge / fullscreen / controls */
+      pointer-events: none;
+    }
+
+    /* Overlay UI */
+    #ui-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+      transition: opacity 0.3s ease;
+    }
+
+    #ui-overlay.dimmed {
+      opacity: 0.35;
+      pointer-events: none;
+    }
+
+    /* Bottom action bar - above bottom ad */
+    #bottom-actions {
+      position: absolute;
+      bottom: calc(10% + 10px);
+      left: 0;
+      right: 0;
+      display: flex;
+      flex-direction: row;
+      justify-content: space-evenly;
+      align-items: flex-end;
+      padding: 0 8px;
+      pointer-events: auto;
+      z-index: 12;
+      direction: rtl; /* starts from the right */
+    }
+
+    /* Circular avatar */
+    #user-avatar {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      border: 2px solid #fff;
+      overflow: hidden;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.45);
+      background: #333;
+      flex-shrink: 0;
+    }
+
+    #user-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .action-btn {
+      width: 48px;
+      height: auto;
+      min-height: 48px;
+      border-radius: 0;
+      background: transparent;
+      backdrop-filter: none;
+      border: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: #fff;
+      transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), color 0.2s;
+      position: relative;
+      font-size: 20px;
+      line-height: 1;
+      padding: 4px 0;
+    }
+
+    .action-btn:active {
+      transform: scale(0.88);
+    }
+
+    .action-btn svg {
+      width: 26px;
+      height: 26px;
+      filter: drop-shadow(0 1px 3px rgba(0,0,0,0.6));
+      transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    /* Logo movement animations */
+    @keyframes icon-bounce {
+      0%   { transform: scale(1) rotate(0deg); }
+      30%  { transform: scale(1.35) rotate(-8deg); }
+      50%  { transform: scale(0.9) rotate(6deg); }
+      70%  { transform: scale(1.15) rotate(-3deg); }
+      100% { transform: scale(1) rotate(0deg); }
+    }
+
+    @keyframes icon-share-fly {
+      0%   { transform: scale(1) translateX(0) rotate(0deg); }
+      40%  { transform: scale(1.25) translateX(6px) rotate(12deg); }
+      70%  { transform: scale(0.95) translateX(-2px) rotate(-4deg); }
+      100% { transform: scale(1) translateX(0) rotate(0deg); }
+    }
+
+
+    .action-btn.animating svg,
+    .action-btn.animating .comment-bubble,
+    .action-btn.animating .live-icon {
+      animation: icon-bounce 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .action-btn.animating-share svg {
+      animation: icon-share-fly 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+
+    #user-avatar {
+      transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    #user-avatar:active {
+      transform: scale(0.9);
+    }
+
+    #user-avatar.animating {
+      animation: icon-bounce 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .action-btn .heart-icon {
+      width: 28px;
+      height: 28px;
+    }
+
+    .action-btn .count {
+      font-size: 11px;
+      font-weight: 600;
+      margin-top: 3px;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+    }
+
+    .action-btn .comment-bubble {
+      width: 30px;
+      height: 30px;
+      filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5));
+    }
+
+    .action-btn .live-icon {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      color: #fff;
+      background: #fe2c55;
+      padding: 7px 9px;
+      border-radius: 6px;
+      line-height: 1;
+      box-shadow: 0 0 10px rgba(254, 44, 85, 0.55);
+    }
+
+    .action-btn.btn-live-sized {
+      min-height: 52px;
+    }
+
+    .action-btn.btn-live-sized .live-icon {
+      font-size: 14px;
+      padding: 8px 10px;
+      transform: scale(1.05);
+    }
+
+    .action-btn .heart-icon {
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      transition: fill 0.2s, stroke 0.2s, transform 0.2s;
+    }
+
+    .action-btn.liked {
+      color: #fe2c55;
+    }
+
+    .action-btn.liked .heart-icon {
+      fill: #fe2c55;
+      stroke: #fe2c55;
+    }
+
+    .action-btn.liked .count {
+      color: #fe2c55;
+    }
+
+    /* Like pop animation */
+    @keyframes like-pop {
+      0%   { transform: scale(1); }
+      25%  { transform: scale(1.4); }
+      50%  { transform: scale(0.88); }
+      75%  { transform: scale(1.15); }
+      100% { transform: scale(1.05); }
+    }
+
+    .action-btn.like-animate .heart-icon {
+      animation: like-pop 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    /* Search button - top left, under the top ad */
+    #btn-search {
+      position: absolute;
+      top: calc(10% + 10px);
+      left: 12px;
+      pointer-events: auto;
+      z-index: 12;
+    }
+
+    /* Bottom info (username + caption) */
+    #video-info {
+      position: absolute;
+      bottom: calc(10% + 72px);
+      left: 16px;
+      right: 16px;
+      pointer-events: none;
+      z-index: 5;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.7);
+    }
+
+    #video-info .username {
+      font-weight: 700;
+      font-size: 15px;
+      margin-bottom: 4px;
+    }
+
+    #video-info .caption {
+      font-size: 14px;
+      opacity: 0.95;
+      line-height: 1.35;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    /* Permanent ad bar - bottom 1/6 */
+    #ad-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 10%;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+      overflow: hidden;
+    }
+
+    #ad-bar .ad-content {
+      text-align: center;
+      padding: 4px 12px;
+    }
+
+    #ad-bar .ad-label {
+      font-size: 9px;
+      opacity: 0.6;
+      letter-spacing: 0.5px;
+      margin-bottom: 1px;
+    }
+
+    #ad-bar .ad-title {
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    #ad-bar .ad-sub {
+      font-size: 10px;
+      opacity: 0.85;
+      margin-top: 0;
+    }
+
+    /* Comments panel (swipe right) */
+    #comments-panel {
+      position: absolute;
+      top: 10%;
+      bottom: 10%;
+      left: 0;
+      width: 100%;
+      background: rgba(15,15,20,0.97);
+      transform: translateX(105%);
+      transition: transform 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+      z-index: 30;
+      display: flex;
+      flex-direction: column;
+      pointer-events: auto;
+      will-change: transform;
+    }
+
+    #comments-panel.open {
+      transform: translateX(0);
+    }
+
+    /* DM / Private Chat Panel */
+    #dm-panel {
+      position: absolute;
+      top: 10%;
+      bottom: 10%;
+      left: 0;
+      width: 100%;
+      background: #0d0d14;
+      transform: translateX(105%);
+      transition: transform 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+      z-index: 31;
+      display: flex;
+      flex-direction: column;
+      pointer-events: auto;
+      will-change: transform;
+    }
+
+    #dm-panel.open {
+      transform: translateX(0);
+    }
+
+    #dm-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(20,20,30,0.9);
+    }
+
+    .dm-user-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .dm-avatar-img {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid #2dd4bf;
+    }
+
+    #dm-name {
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    #dm-status {
+      font-size: 11px;
+      color: #2dd4bf;
+      opacity: 0.9;
+    }
+
+    #close-dm {
+      background: none;
+      border: none;
+      color: #fff;
+      font-size: 22px;
+      cursor: pointer;
+      padding: 4px 8px;
+    }
+
+    #dm-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .dm-msg {
+      max-width: 75%;
+      padding: 10px 14px;
+      border-radius: 16px;
+      font-size: 14px;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+
+    .dm-msg.them {
+      align-self: flex-start;
+      background: rgba(255,255,255,0.1);
+      border-bottom-left-radius: 4px;
+    }
+
+    .dm-msg.me {
+      align-self: flex-end;
+      background: #2dd4bf;
+      color: #000;
+      border-bottom-right-radius: 4px;
+    }
+
+    .dm-msg .dm-time {
+      font-size: 10px;
+      opacity: 0.6;
+      margin-top: 4px;
+      text-align: left;
+    }
+
+    .dm-msg.me .dm-time {
+      text-align: right;
+    }
+
+    #dm-input-bar {
+      padding: 12px 16px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      background: rgba(15,15,22,0.95);
+    }
+
+    #dm-input {
+      flex: 1;
+      background: rgba(255,255,255,0.08);
+      border: none;
+      border-radius: 20px;
+      padding: 11px 16px;
+      color: #fff;
+      font-size: 15px;
+      outline: none;
+    }
+
+    #dm-input::placeholder {
+      color: rgba(255,255,255,0.45);
+    }
+
+    #send-dm {
+      background: #2dd4bf;
+      border: none;
+      color: #000;
+      font-weight: 600;
+      padding: 10px 16px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    #comments-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    #comments-header h3 {
+      font-size: 17px;
+      font-weight: 600;
+    }
+
+    #close-comments {
+      background: none;
+      border: none;
+      color: #fff;
+      font-size: 24px;
+      cursor: pointer;
+      padding: 4px 8px;
+    }
+
+    #comments-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 16px;
+    }
+
+    .comment {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .comment-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #444;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    .comment-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .comment-body {
+      flex: 1;
+    }
+
+    .comment-user {
+      font-weight: 600;
+      font-size: 13px;
+      margin-bottom: 2px;
+    }
+
+    .comment-text {
+      font-size: 14px;
+      opacity: 0.9;
+      line-height: 1.4;
+    }
+
+    #comment-input-bar {
+      padding: 12px 16px;
+      padding-bottom: max(12px, env(safe-area-inset-bottom));
+      border-top: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    #comment-input {
+      flex: 1;
+      background: rgba(255,255,255,0.1);
+      border: none;
+      border-radius: 20px;
+      padding: 10px 16px;
+      color: #fff;
+      font-size: 15px;
+      outline: none;
+    }
+
+    #comment-input::placeholder {
+      color: rgba(255,255,255,0.5);
+    }
+
+    #send-comment {
+      background: #2dd4bf;
+      border: none;
+      color: #000;
+      font-weight: 600;
+      padding: 10px 16px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    /* Profile panel (swipe left) */
+    #profile-panel {
+      position: absolute;
+      top: 10%;
+      bottom: 10%;
+      left: 0;
+      width: 100%;
+      background: #0d0d12;
+      transform: translateX(-105%);
+      transition: transform 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+      z-index: 30;
+      display: flex;
+      flex-direction: column;
+      pointer-events: auto;
+      overflow-y: auto;
+      will-change: transform;
+    }
+
+    #profile-panel.open {
+      transform: translateX(0);
+    }
+
+    #profile-header {
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    /* Live / Camera Panel */
+    #live-panel {
+      position: absolute;
+      top: 10%;
+      bottom: 10%;
+      left: 0;
+      width: 100%;
+      background: #000;
+      transform: translateY(105%);
+      transition: transform 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+      z-index: 35;
+      visibility: hidden;
+      transition: transform 0.38s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 0.38s;
+      display: flex;
+      flex-direction: column;
+      pointer-events: auto;
+    }
+
+    #live-panel.open {
+      visibility: visible;
+      transition: transform 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+      transform: translateY(0);
+    }
+
+    #live-header {
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(0,0,0,0.7);
+      z-index: 2;
+    }
+
+    #live-header button {
+      background: rgba(255,255,255,0.15);
+      border: none;
+      color: #fff;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    #live-title {
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    #live-preview-wrap {
+      flex: 1;
+      position: relative;
+      background: #111;
+      overflow: hidden;
+    }
+
+    #live-preview {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    #live-badge {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: #fe2c55;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 4px;
+    }
+
+    #live-controls {
+      display: flex;
+      gap: 10px;
+      padding: 14px 16px;
+      background: rgba(0,0,0,0.85);
+      justify-content: center;
+    }
+
+    .live-ctrl-btn {
+      flex: 1;
+      padding: 12px 8px;
+      border: none;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.12);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .live-ctrl-btn.live-go {
+      background: #fe2c55;
+    }
+
+    .live-ctrl-btn.recording {
+      background: #c41e3a;
+      animation: pulse-rec 1s infinite;
+    }
+
+    @keyframes pulse-rec {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    
+
+    #close-profile {
+      background: none;
+      border: none;
+      color: #fff;
+      font-size: 24px;
+      cursor: pointer;
+      padding: 4px;
+    }
+
+    #profile-content {
+      padding: 24px 20px;
+      text-align: center;
+    }
+
+    #profile-avatar-large {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      margin: 0 auto 16px;
+      overflow: hidden;
+      border: 3px solid #2dd4bf;
+      background: #333;
+    }
+
+    #profile-avatar-large img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    #profile-name {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+
+    #profile-bio {
+      font-size: 14px;
+      opacity: 0.85;
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+
+    .profile-stats {
+      display: flex;
+      justify-content: center;
+      gap: 28px;
+      margin-bottom: 24px;
+    }
+
+    .stat {
+      text-align: center;
+    }
+
+    .stat-num {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      opacity: 0.6;
+      margin-top: 2px;
+    }
+
+    /* Search & Settings modals (simple) */
+    .modal {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      z-index: 40;
+      display: none;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: max(60px, env(safe-area-inset-top) + 40px);
+      pointer-events: auto;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+    }
+
+    .modal.open {
+      display: flex;
+      opacity: 1;
+    }
+
+    .modal-box {
+      background: #1a1a22;
+      border-radius: 16px;
+      width: 90%;
+      max-width: 360px;
+      padding: 20px;
+      border: 1px solid rgba(255,255,255,0.1);
+      transform: translateY(18px) scale(0.96);
+      transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .modal.open .modal-box {
+      transform: translateY(0) scale(1);
+    }
+
+    .modal-box h3 {
+      margin-bottom: 16px;
+      font-size: 18px;
+    }
+
+    .modal-box input {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: none;
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      font-size: 15px;
+      margin-bottom: 12px;
+      outline: none;
+    }
+
+    .modal-box button {
+      width: 100%;
+      padding: 12px;
+      border-radius: 10px;
+      border: none;
+      background: #2dd4bf;
+      color: #000;
+      font-weight: 600;
+      font-size: 15px;
+      cursor: pointer;
+    }
+
+    .close-modal {
+      position: absolute;
+      top: max(16px, env(safe-area-inset-top));
+      left: 16px;
+      background: rgba(255,255,255,0.15);
+      border: none;
+      color: #fff;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      font-size: 20px;
+      cursor: pointer;
+    }
+
+    /* Create / editor */
+    #create-panel{position:absolute;inset:0;background:#0b0b10;z-index:60;display:none;flex-direction:column;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+    #create-panel.open{display:flex}
+    .cr-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px}
+    .cr-head button{background:rgba(255,255,255,.12);border:none;color:#fff;border-radius:18px;padding:8px 14px;font-size:14px;font-weight:600;cursor:pointer}
+    .cr-head .cr-pub{background:#fe2c55}
+    #cr-stage{flex:1;min-height:0;display:flex;justify-content:center;background:#000}
+    #cr-frame{position:relative;height:100%;aspect-ratio:9/16;max-width:100%;overflow:hidden;background:#111}
+    #cr-video{width:100%;height:100%;object-fit:cover}
+    #cr-hint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;opacity:.6;font-size:14px}
+    .ov-layer{position:absolute;inset:0;pointer-events:none;container-type:inline-size}
+    .ov-item{position:absolute;transform:translate(-50%,-50%);font-weight:800;white-space:nowrap;text-shadow:0 1px 4px rgba(0,0,0,.7);pointer-events:none}
+    #cr-ov .ov-item{pointer-events:auto;touch-action:none;cursor:grab}
+    #cr-info{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 14px;font-size:12px}
+    #cr-tabs{display:flex;gap:6px;overflow-x:auto;padding:0 14px 8px}
+    #cr-tabs button{flex-shrink:0;background:rgba(255,255,255,.08);border:none;color:#fff;border-radius:16px;padding:7px 13px;font-size:13px;cursor:pointer}
+    #cr-tabs button.on,.chip.on{background:#2dd4bf;color:#000}
+    .cr-tools{padding:4px 14px 14px;min-height:110px;max-height:30%;overflow-y:auto}
+    .cr-pane{display:none}.cr-pane.show{display:block}
+    .cr-pane label{display:block;font-size:12px;opacity:.8;margin:6px 0 2px}
+    .chips{display:flex;flex-wrap:wrap;gap:6px}
+    .chip{background:rgba(255,255,255,.1);border:none;color:#fff;border-radius:14px;padding:7px 12px;font-size:13px;cursor:pointer;display:inline-block}
+    #create-panel input[type=range]{direction:ltr;width:100%}
+    #create-panel input[type=text]{width:100%;padding:10px 12px;border-radius:10px;border:none;background:rgba(255,255,255,.08);color:#fff;font-size:15px;outline:none;margin:6px 0}
+
+    #video-info .vi-row{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+    #video-info .vi-row .username{margin-bottom:0}
+    #video-info #user-avatar{width:40px;height:40px;pointer-events:auto}
+    .mp-icon{font-weight:800;color:#000;background:#fff;border-radius:6px;line-height:1;box-shadow:0 2px 8px rgba(0,0,0,.45)}
+    .action-btn.btn-live-sized .live-icon,.action-btn.btn-live-sized .mp-icon{display:inline-block;box-sizing:border-box;width:60px;padding:8px 0;text-align:center;font-size:14px;letter-spacing:.8px;transform:scale(1.05)}
+    .action-btn.animating .mp-icon{animation:icon-bounce .45s cubic-bezier(0.22,1,0.36,1)}
+
+    #inbox-panel{position:absolute;top:10%;bottom:10%;left:0;width:100%;background:#0d0d14;transform:translateX(-105%);transition:transform .38s cubic-bezier(.22,1,.36,1);z-index:30;display:flex;flex-direction:column;pointer-events:auto;will-change:transform}
+    #inbox-panel.open{transform:translateX(0)}
+    #inbox-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.08);font-weight:600;font-size:17px}
+    #close-inbox{background:none;border:none;color:#fff;font-size:22px;cursor:pointer;padding:4px 8px}
+    #inbox-list{flex:1;overflow-y:auto}
+    .inbox-row{display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.05)}
+    .inbox-row img{width:46px;height:46px;border-radius:50%;flex-shrink:0}
+    .inbox-txt{flex:1;min-width:0}
+    .inbox-name{font-weight:600;font-size:15px}
+    .inbox-last{font-size:13px;opacity:.65;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .inbox-time{font-size:11px;opacity:.5;flex-shrink:0}
+    #video-container{-webkit-touch-callout:none;touch-action:none}
+    #btn-speed{position:absolute;top:calc(10% + 10px);right:12px;pointer-events:auto;z-index:12}
+    #player-ctrl{position:absolute;left:14px;right:14px;bottom:calc(10% + 6px);display:flex;align-items:center;gap:8px;direction:ltr;font-size:12px;font-variant-numeric:tabular-nums;pointer-events:auto;z-index:12;text-shadow:0 1px 3px rgba(0,0,0,.8)}
+    #btn-speed,#player-ctrl{opacity:0;visibility:hidden;transition:opacity .2s}
+    #ui-overlay.ctrl-on #btn-speed,#ui-overlay.ctrl-on #player-ctrl{opacity:1;visibility:visible}
+    #bottom-actions,#video-info{transition:bottom .2s}
+    #ui-overlay.ctrl-on #bottom-actions{bottom:calc(10% + 46px)}
+    #ui-overlay.ctrl-on #video-info{bottom:calc(10% + 108px)}
+    #speed-menu{position:absolute;top:calc(10% + 66px);right:12px;display:none;flex-direction:column;gap:2px;background:rgba(0,0,0,.78);border-radius:12px;padding:6px;z-index:13;pointer-events:auto}
+    #speed-menu.open{display:flex}
+    #speed-menu button{background:none;border:none;color:#fff;font-size:14px;padding:8px 16px;border-radius:8px;cursor:pointer}
+    #speed-menu button.on{background:#2dd4bf;color:#000}
+    .heart-burst{position:absolute;font-size:84px;pointer-events:none;z-index:15;animation:burst .75s ease-out forwards}
+    @keyframes burst{0%{transform:translate(-50%,-50%) scale(0);opacity:1}30%{transform:translate(-50%,-50%) scale(1.2)}100%{transform:translate(-50%,-80%) scale(1);opacity:0}}
+    #cap-wrap .caption{display:block;-webkit-line-clamp:unset;white-space:pre-line}
+    #cap-wrap{position:relative}
+    #cap-more,#cap-less{background:none;border:none;color:#fff;padding:0;margin-inline-start:6px;font-size:14.5px;font-weight:800;line-height:1.35;cursor:pointer;pointer-events:auto;text-shadow:0 1px 4px rgba(0,0,0,.85);letter-spacing:.2px}
+    #cap-more[hidden]{display:none}
+    #cap-wrap.expanded .caption{display:block;-webkit-line-clamp:unset;max-height:34dvh;overflow-y:auto;pointer-events:auto;background:rgba(0,0,0,.4);border-radius:10px;padding:8px 10px}
+    #cap-wrap.expanded #cap-less{display:block;margin-top:6px;margin-inline-start:auto}
+    #hold-badge{position:absolute;top:calc(10% + 14px);left:50%;transform:translateX(-50%);background:rgba(0,0,0,.6);padding:6px 14px;border-radius:16px;font-weight:700;font-size:14px;opacity:0;transition:opacity .15s;pointer-events:none;z-index:12}
+    #hold-badge.show{opacity:1}
+    #btn-follow{display:block;margin:0 auto 20px;background:#fe2c55;color:#fff;border:none;border-radius:8px;padding:10px 36px;font-weight:700;font-size:15px;cursor:pointer}
+    #btn-follow.following{background:rgba(255,255,255,.14)}
+    .profile-stats{gap:18px}
+    #create-panel textarea{width:100%;padding:10px 12px;border-radius:10px;border:none;background:rgba(255,255,255,.08);color:#fff;font-size:15px;outline:none;margin:6px 0;resize:none;font-family:inherit}
+    .share-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px 8px}
+    .modal-box .share-item{display:flex;flex-direction:column;align-items:center;gap:6px;width:auto;margin:0;padding:0;background:none;color:#fff;text-decoration:none;font-size:11px;border:none;cursor:pointer}
+    .share-ic{width:50px;height:50px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#fff}
+    #btn-sound{width:34px;height:34px;border-radius:50%;background:#fff;border:none;display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0;cursor:pointer;pointer-events:auto}
+    .tag{color:#8ecbff;font-weight:600}
+    #sound-panel{position:absolute;top:10%;bottom:10%;left:0;width:100%;background:#0d0d14;transform:translateX(105%);transition:transform .38s cubic-bezier(.22,1,.36,1);z-index:30;display:flex;flex-direction:column;pointer-events:auto;will-change:transform}
+    #sound-panel.open{transform:translateX(0)}
+    #sound-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.08)}
+    #close-sound{background:none;border:none;color:#fff;font-size:22px;cursor:pointer;padding:4px 8px}
+    #sound-title{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #sound-sub{font-size:12px;opacity:.6}
+    #sound-grid{flex:1;overflow-y:auto;display:grid;grid-template-columns:repeat(3,1fr);gap:3px;padding:3px;align-content:start}
+    .sound-cell{position:relative;aspect-ratio:9/16;background:#1a1a22;overflow:hidden;cursor:pointer}
+    .sound-cell video{width:100%;height:100%;object-fit:cover;pointer-events:none}
+    .orig-tag{position:absolute;top:6px;left:6px;background:#e11d48;color:#fff;font-size:10px;font-weight:800;padding:3px 6px;border-radius:4px}
+    .sound-likes{position:absolute;bottom:6px;left:6px;font-size:12px;font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,.8)}
+    .modal-box textarea{width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:none;background:rgba(255,255,255,.08);color:#fff;font-size:15px;outline:none;resize:none;font-family:inherit}
+    #seek{position:relative;flex:1;height:32px;touch-action:none;cursor:pointer}
+    #seek::before{content:"";position:absolute;left:0;right:0;top:50%;height:3px;margin-top:-1.5px;border-radius:2px;background:rgba(255,255,255,.35)}
+    #seek-fill{position:absolute;left:0;top:50%;height:3px;margin-top:-1.5px;border-radius:2px;background:#fff;width:0}
+    #seek-thumb{position:absolute;top:50%;left:0;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;background:#fff;box-shadow:0 0 4px rgba(0,0,0,.5);transition:transform .1s}
+    #seek.drag #seek-thumb{transform:scale(1.35)}
+    .carousel{position:absolute;inset:0;overflow:hidden;direction:ltr;background:#000}
+    .car-track{display:flex;height:100%;transition:transform .3s ease}
+    .car-track img{flex:0 0 100%;width:100%;height:100%;object-fit:cover;-webkit-user-drag:none}
+    #btn-menu{position:absolute;top:calc(10% + 10px);left:12px;pointer-events:auto;z-index:12}
+    #btn-search{left:64px}
+    #menu-pop{position:absolute;top:calc(10% + 66px);left:12px;display:none;flex-direction:column;background:rgba(0,0,0,.85);border-radius:12px;padding:6px;z-index:13;pointer-events:auto;min-width:170px}
+    #menu-pop.open{display:flex}
+    #menu-pop button{background:none;border:none;color:#fff;font-size:15px;padding:10px 14px;border-radius:8px;text-align:start;cursor:pointer}
+    #btn-cc{position:absolute;top:calc(10% + 10px);right:68px;pointer-events:auto;z-index:12;opacity:0;visibility:hidden;transition:opacity .2s}
+    #ui-overlay.ctrl-on #btn-cc{opacity:1;visibility:visible}
+    .cc-icon{border:2px solid #fff;border-radius:6px;padding:3px 6px;font-size:12px;font-weight:800;line-height:1;background:rgba(0,0,0,.35)}
+    #btn-cc.on .cc-icon{background:#fff;color:#000}
+    #live-cap{font-size:14px;opacity:.95;line-height:1.35;margin-bottom:6px}
+    #hist-panel{position:absolute;top:10%;bottom:10%;left:0;width:100%;background:#0d0d14;transform:translateX(105%);transition:transform .38s cubic-bezier(.22,1,.36,1);z-index:30;display:flex;flex-direction:column;pointer-events:auto;will-change:transform}
+    #hist-panel.open{transform:translateX(0)}
+    #hist-header{direction:ltr;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.08)}
+    #close-hist,#hist-search-btn{background:none;border:none;color:#fff;cursor:pointer;padding:4px 8px;display:flex}
+    #close-hist{font-size:22px}
+    #hist-title{font-weight:600;font-size:15px}
+    #hist-sub{font-size:12px;opacity:.6}
+    #hist-q{display:block;margin:8px 12px 0;padding:10px 12px;border-radius:10px;border:none;background:rgba(255,255,255,.08);color:#fff;font-size:15px;outline:none}
+    #hist-q[hidden]{display:none}
+    #hist-grid{flex:1;overflow-y:auto;display:grid;grid-template-columns:repeat(3,1fr);gap:3px;padding:3px;align-content:start}
+    .hist-empty{grid-column:1/-1;text-align:center;opacity:.5;padding:40px 0}
+    .sound-cell img{width:100%;height:100%;object-fit:cover;pointer-events:none}
+    .car-track img{background:#111}
+    #photo-dots{display:flex;justify-content:center;gap:6px;margin-bottom:8px}
+    #photo-dots[hidden]{display:none}
+    #photo-dots span{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.45)}
+    #photo-dots span.on{background:#fff}
+    .lang-row{display:flex;gap:8px;margin-bottom:16px}
+    .lang-row button{flex:1;width:auto;background:rgba(255,255,255,.1);color:#fff}
+    .lang-row button.on{background:#2dd4bf;color:#000}
+
+</style>
+</head>
+<body>
+  <div id="app">
+    <!-- Top permanent ad -->
+    <div id="ad-bar-top">
+      <div class="ad-content">
+        <div class="ad-label">פרסומת</div>
+        <div class="ad-title">UploadVid Premium</div>
+        <div class="ad-sub">חוויה בלי פרסומות • שדרוג עכשיו</div>
+      </div>
+    </div>
+
+    <div id="video-container"></div>
+
+    <div id="ui-overlay">
+      <!-- Bottom action bar (right → left): MP, Like, Comments, Share, LIVE -->
+      <div id="bottom-actions">
+        <button class="action-btn btn-live-sized" id="btn-mp" title="הפרופיל שלי" aria-label="הפרופיל שלי">
+          <span class="mp-icon">MP</span>
+        </button>
+
+        <button class="action-btn" id="btn-like" title="לייק" aria-label="לייק">
+          <svg class="heart-icon" viewBox="0 0 24 24" width="28" height="28">
+            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+          </svg>
+          <span class="count" id="like-count">0</span>
+        </button>
+
+        <button class="action-btn" id="btn-comments" title="תגובות" aria-label="תגובות">
+          <!-- White balloon with black ABC -->
+          <svg class="comment-bubble" viewBox="0 0 48 48" width="30" height="30">
+            <path fill="#ffffff" d="M24 4C13.5 4 5 11.6 5 21c0 5.2 2.6 9.9 6.7 13.1V44l7.2-4c1.6.4 3.3.7 5.1.7 10.5 0 19-7.6 19-17S34.5 4 24 4z"/>
+            <text x="24" y="25" text-anchor="middle" fill="#000000" font-size="11" font-weight="800" font-family="Arial, sans-serif">ABC</text>
+          </svg>
+          <span class="count" id="comment-count">0</span>
+        </button>
+
+        <button class="action-btn" id="btn-share" title="שיתוף" aria-label="שיתוף">
+          <!-- TikTok-style curved filled share arrow -->
+          <svg viewBox="0 0 48 48" width="30" height="30" fill="currentColor">
+            <path d="M27.3 9.2c0-1.6 1.9-2.5 3.1-1.4l14.8 13.4c.9.8.9 2.2 0 3L30.4 37.6c-1.2 1.1-3.1.2-3.1-1.4v-7.4C16.2 28.8 9.2 32.1 4.8 39.4c-.7 1.2-2.5.6-2.3-.8C4.4 25.4 12.6 17.5 27.3 16.6V9.2z"/>
+          </svg>
+          <span class="count" id="share-count">0</span>
+        </button>
+
+        <button class="action-btn btn-live-sized" id="btn-live" title="Live" aria-label="Live">
+          <span class="live-icon">LIVE</span>
+        </button>
+      </div>
+
+      <!-- Menu button (left of search) -->
+      <button class="action-btn" id="btn-menu" title="תפריט" aria-label="תפריט">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <div id="menu-pop">
+        <button id="menu-refresh">🔄 רענן</button>
+        <button id="menu-history">🕘 היסטוריית צפייה</button>
+      </div>
+
+      <!-- Search button: top-left, TikTok style -->
+      <button class="action-btn" id="btn-search" title="חיפוש" aria-label="חיפוש">
+        <svg viewBox="0 0 48 48" width="28" height="28" fill="none" stroke="currentColor" stroke-width="4.4" stroke-linecap="round">
+          <circle cx="21.5" cy="21.5" r="13.5"/>
+          <path d="M31.5 31.5L41 41"/>
+        </svg>
+      </button>
+
+      <div id="hold-badge"></div>
+      <!-- Player controls (shown on single tap) -->
+      <button class="action-btn" id="btn-cc" title="Captions" aria-label="Captions"><span class="cc-icon">CC</span></button>
+      <button class="action-btn" id="btn-speed" title="מהירות" aria-label="מהירות">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 6l-5 6 5 6"/><path d="M15 6l-5 6 5 6"/><path d="M21 6l-5 6 5 6"/>
+        </svg>
+      </button>
+      <div id="speed-menu">
+        <button data-s="0.1">0.1x</button><button data-s="0.5">0.5x</button><button data-s="1" class="on">1x</button><button data-s="2">2x</button><button data-s="3">3x</button>
+      </div>
+      <div id="player-ctrl">
+        <span id="t-cur">0:00</span>
+        <div id="seek"><div id="seek-fill"></div><div id="seek-thumb"></div></div>
+        <span id="t-dur">0:00</span>
+      </div>
+
+      <div id="video-info">
+        <div id="photo-dots" hidden></div>
+        <div id="live-cap" hidden></div>
+        <div class="vi-row">
+          <div id="user-avatar" title="פרופיל המשתמש">
+            <img id="avatar-img" alt="uploader" />
+          </div>
+          <button id="btn-sound" title="סאונד" aria-label="סאונד">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="#000"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+          </button>
+          <div class="username" id="info-username">user1</div>
+        </div>
+        <div id="cap-wrap"><div class="caption" id="info-caption">תיאור הסרטון...</div></div>
+      </div>
+
+          </div>
+
+    <div id="ad-bar">
+      <div class="ad-content">
+        <div class="ad-label">פרסומת</div>
+        <div class="ad-title">UploadVid – העלה ושתף</div>
+        <div class="ad-sub">האפליקציה שלך לסרטונים קצרים</div>
+      </div>
+    </div>
+
+    <!-- Comments Panel -->
+    <div id="comments-panel">
+      <div id="comments-header">
+        <h3>תגובות</h3>
+        <button id="close-comments">✕</button>
+      </div>
+      <div id="comments-list"></div>
+      <div id="comment-input-bar">
+        <input type="text" id="comment-input" placeholder="כתוב תגובה..." />
+        <button id="send-comment">שלח</button>
+      </div>
+    </div>
+
+    <!-- Private DM / Encrypted Chat Panel (swipe right) -->
+    <div id="dm-panel">
+      <div id="dm-header">
+        <div class="dm-user-info">
+          <img id="dm-avatar" alt="" class="dm-avatar-img" />
+          <div>
+            <div id="dm-name">שם משתמש</div>
+            <div id="dm-status">🔒 הודעה מוצפנת מקצה לקצה</div>
+          </div>
+        </div>
+        <button id="close-dm">✕</button>
+      </div>
+      <div id="dm-messages"></div>
+      <div id="dm-input-bar">
+        <input type="text" id="dm-input" placeholder="הודעה פרטית מוצפנת..." />
+        <button id="send-dm">שלח</button>
+      </div>
+    </div>
+
+    <!-- Profile Panel -->
+    <div id="profile-panel">
+      <div id="profile-header">
+        <button id="close-profile">←</button>
+        <span style="font-weight:600;font-size:16px;flex:1;text-align:center;">פרופיל</span>
+        <button id="btn-live-mp" class="action-btn btn-live-sized" title="Live" aria-label="Live" style="display:none;min-height:0;width:auto;padding:0 4px;"><span class="live-icon">LIVE</span></button>
+        <button id="btn-inbox" title="הודעות" aria-label="הודעות" style="background:none;border:none;color:#fff;padding:4px;cursor:pointer;">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round">
+            <rect x="3" y="5" width="18" height="14" rx="2"/>
+            <path d="M3.5 7l8.5 6.2L20.5 7"/>
+          </svg>
+        </button>
+        <button id="btn-settings-profile" title="הגדרות" aria-label="הגדרות" style="background:none;border:none;color:#fff;padding:4px;cursor:pointer;">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.9 1 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+      </div>
+      <div id="profile-content">
+        <div id="profile-avatar-large">
+          <img id="profile-img" alt="" />
+        </div>
+        <div id="profile-name">user1</div>
+        <div id="profile-bio">ביו של המשתמש יופיע כאן. אוהב לצלם רגעים יומיומיים ולשתף עם העולם.</div>
+        <button id="btn-follow">Follow</button>
+        <div class="profile-stats">
+          <div class="stat">
+            <div class="stat-num" id="stat-videos">12</div>
+            <div class="stat-label">סרטונים</div>
+          </div>
+          <div class="stat">
+            <div class="stat-num" id="stat-followers">8.4K</div>
+            <div class="stat-label">עוקבים</div>
+          </div>
+          <div class="stat">
+            <div class="stat-num" id="stat-following">312</div>
+            <div class="stat-label">עוקב אחרי</div>
+          </div>
+          <div class="stat">
+            <div class="stat-num" id="stat-likes">0</div>
+            <div class="stat-label">לייקים</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DM inbox (conversation list) -->
+    <div id="inbox-panel">
+      <div id="inbox-header"><button id="close-inbox">✕</button><span>הודעות</span><span style="width:36px"></span></div>
+      <div id="inbox-list"></div>
+    </div>
+
+    <!-- Watch history -->
+    <div id="hist-panel">
+      <div id="hist-header">
+        <button id="close-hist">✕</button>
+        <div style="text-align:center;min-width:0"><div id="hist-title">היסטוריית צפייה</div><div id="hist-sub"></div></div>
+        <button id="hist-search-btn" title="חיפוש בהיסטוריה" aria-label="חיפוש בהיסטוריה">
+          <svg viewBox="0 0 48 48" width="24" height="24" fill="none" stroke="currentColor" stroke-width="4.4" stroke-linecap="round"><circle cx="21.5" cy="21.5" r="13.5"/><path d="M31.5 31.5L41 41"/></svg>
+        </button>
+      </div>
+      <input type="text" id="hist-q" placeholder="חפש בהיסטוריית הצפייה..." hidden />
+      <div id="hist-grid"></div>
+    </div>
+
+    <!-- Sound page: all videos using the same sound -->
+    <div id="sound-panel">
+      <div id="sound-header">
+        <button id="close-sound">✕</button>
+        <div style="text-align:center;min-width:0"><div id="sound-title"></div><div id="sound-sub"></div></div>
+        <span style="width:36px"></span>
+      </div>
+      <div id="sound-grid"></div>
+    </div>
+
+    <!-- Live / Camera Panel -->
+    <div id="live-panel">
+      <div id="live-header">
+        <button id="close-live">✕</button>
+        <span id="live-title">מצלמה / Live</span>
+        <button id="btn-flip-camera" title="הפוך מצלמה">🔄</button>
+      </div>
+      <div id="live-preview-wrap">
+        <video id="live-preview" autoplay playsinline muted></video>
+        <div id="live-badge" style="display:none;">🔴 LIVE</div>
+      </div>
+      <div id="live-controls" style="flex-wrap:wrap;">
+        <button class="live-ctrl-btn" id="btn-create" style="flex-basis:100%;background:#2dd4bf;color:#000;">✂️ Create</button>
+        <button class="live-ctrl-btn" id="btn-take-photo">📷 תמונה</button>
+        <button class="live-ctrl-btn" id="btn-record-video">🎥 וידאו</button>
+        <button class="live-ctrl-btn live-go" id="btn-go-live">🔴 התחל Live</button>
+      </div>
+    </div>
+
+    <!-- Create / video editor -->
+    <div id="create-panel">
+      <div class="cr-head">
+        <button id="cr-close">✕</button>
+        <b>Create</b>
+        <button id="cr-publish" class="cr-pub">פרסם</button>
+      </div>
+      <div id="cr-stage"><div id="cr-frame">
+        <video id="cr-video" playsinline loop></video>
+        <div id="cr-ov" class="ov-layer"></div>
+        <div id="cr-hint">העלה סרטון כדי להתחיל לערוך<br>(עד 60 דקות)</div>
+      </div></div>
+      <div id="cr-info">
+        <span id="cr-len"></span>
+        <span><label class="chip">⬆️ העלה סרטון<input type="file" id="cr-file" accept="video/*" hidden></label>
+        <button class="chip" id="cr-undo">↩️ מחק אחרון</button></span>
+      </div>
+      <div style="padding:0 14px"><textarea id="cr-caption" rows="2" placeholder="כיתוב לסרטון..."></textarea>
+        <div id="cr-wc" style="font-size:11px;opacity:.6;text-align:end">0/1000 • #0/10</div></div>
+      <div id="cr-tabs">
+        <button data-t="trim" class="on">✂️ חיתוך</button><button data-t="speed">⏩ מהירות</button><button data-t="filters">🎨 פילטרים</button><button data-t="adjust">🎚️ כוונון</button><button data-t="text">Aa טקסט</button><button data-t="stk">😊 סטיקרים</button><button data-t="sound">🔊 סאונד</button>
+      </div>
+      <div class="cr-tools">
+        <div class="cr-pane show" id="pane-trim">
+          <label>התחלה</label><input type="range" id="cr-start" min="0" max="1" step="0.1" value="0">
+          <label>סוף</label><input type="range" id="cr-end" min="0" max="1" step="0.1" value="1">
+        </div>
+        <div class="cr-pane" id="pane-speed"><div class="chips" id="cr-speed"></div></div>
+        <div class="cr-pane" id="pane-filters"><div class="chips" id="cr-filters"></div></div>
+        <div class="cr-pane" id="pane-adjust">
+          <label>בהירות</label><input type="range" id="cr-bright" min="0.5" max="1.5" step="0.05" value="1">
+          <label>ניגודיות</label><input type="range" id="cr-contrast" min="0.5" max="1.5" step="0.05" value="1">
+          <label>רוויה</label><input type="range" id="cr-sat" min="0" max="2" step="0.05" value="1">
+          <div class="chips" style="margin-top:8px"><button class="chip" id="cr-flip">↔️ הפוך</button><button class="chip" id="cr-reset">אפס</button></div>
+        </div>
+        <div class="cr-pane" id="pane-text">
+          <input type="text" id="cr-text" placeholder="כתוב טקסט..." />
+          <div class="chips" id="cr-colors"></div>
+          <div class="chips" style="margin-top:8px"><button class="chip on" id="cr-addtext">➕ הוסף טקסט</button></div>
+        </div>
+        <div class="cr-pane" id="pane-stk"><div class="chips" id="cr-stk"></div></div>
+        <div class="cr-pane" id="pane-sound">
+          <label>עוצמת קול (0 = השתק)</label><input type="range" id="cr-vol" min="0" max="1" step="0.05" value="1">
+        </div>
+      </div>
+    </div>
+
+    <!-- Share sheet -->
+    <div class="modal" id="share-modal">
+      <button class="close-modal" data-close="share-modal">✕</button>
+      <div class="modal-box">
+        <h3>שתף ל…</h3>
+        <div class="share-grid" id="share-grid"></div>
+      </div>
+    </div>
+
+    <!-- Report -->
+    <div class="modal" id="report-modal">
+      <button class="close-modal" data-close="report-modal">✕</button>
+      <div class="modal-box">
+        <h3>דווח על סרטון</h3>
+        <textarea id="report-text" rows="5" placeholder="מה הבעיה בסרטון?"></textarea>
+        <button id="report-send" style="margin-top:10px;">שלח דיווח</button>
+      </div>
+    </div>
+
+    <!-- Long-press menu -->
+    <div class="modal" id="lp-modal">
+      <button class="close-modal" data-close="lp-modal">✕</button>
+      <div class="modal-box">
+        <h3>אפשרויות</h3>
+        <button id="lp-save">💾 שמור לטלפון</button>
+        <button id="lp-share" style="margin-top:8px;">↗️ שתף</button>
+        <button id="lp-report" style="margin-top:8px;background:#e11d48;color:#fff;">🚩 דווח על סרטון</button>
+      </div>
+    </div>
+
+    <!-- Search Modal -->
+    <div class="modal" id="search-modal">
+      <button class="close-modal" data-close="search-modal">✕</button>
+      <div class="modal-box">
+        <h3>חיפוש</h3>
+        <input type="text" placeholder="חפש סרטונים או משתמשים..." id="search-input" />
+        <button>חפש</button>
+      </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal" id="settings-modal">
+      <button class="close-modal" data-close="settings-modal">✕</button>
+      <div class="modal-box">
+        <h3>הגדרות</h3>
+        <p style="opacity:0.7;font-size:14px;margin-bottom:16px;">גרסה ראשונית של UploadVid</p>
+        <h4 style="font-size:14px;margin-bottom:8px;">🌐 שפה / Language</h4>
+        <div class="lang-row"><button id="lang-he">עברית</button><button id="lang-en">English</button></div>
+        <button data-close="settings-modal">סגור</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Mock video data (using free Mixkit + lorem.video)
+    function makeAvatar(n, c) {
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="${c}"/><text x="50" y="50" dy=".35em" text-anchor="middle" font-size="48" font-weight="700" font-family="Arial" fill="#fff">${n[0].toUpperCase()}</text></svg>`;
+      return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
+    }
+    const USERS = [
+      ["noa_fit","#e11d48","מאמנת כושר 💪","12.4K"],["dan_k","#2563eb","אוהב לבשל ולטייל","3.1K"],
+      ["maya_art","#9333ea","ציורים ואמנות דיגיטלית 🎨","8.9K"],["yossi_beats","#ea580c","מפיק מוזיקה 🎧","21K"],
+      ["tal_trip","#059669","מטייל בעולם ✈️","5.6K"],["shir_chef","#db2777","שפית ביתית 🍝","15.2K"],
+      ["omer_game","#4f46e5","גיימר ויוטיובר 🎮","32K"],["lior_dance","#d97706","רקדנית 💃","9.7K"],
+      ["ron_pets","#0d9488","הכלב שלי הוא הכוכב 🐶","6.3K"],["yael_diy","#7c3aed","עשה זאת בעצמך 🔨","4.8K"]
+    ].map(([name, c, bio, f]) => ({ name, bio, f, fn: Math.round(parseFloat(f) * (/K$/.test(f) ? 1000 : 1)), avatar: makeAvatar(name, c) }));
+    const ME = { name: "user1", bio: "ביו של המשתמש יופיע כאן. אוהב לצלם רגעים יומיומיים ולשתף עם העולם.", f: "8.4K", fn: 8400, avatar: makeAvatar("user1", "#2dd4bf") };
+
+    const mkUser = ([name, c, bio, f]) => ({ name, bio, f, fn: Math.round(parseFloat(f) * (/K$/.test(f) ? 1000 : 1)), avatar: makeAvatar(name, c) });
+    const PHOTO_USERS = [
+      ["pixel_pete","#0ea5e9","צלם נוף 📷","7.2K"],["lena_lens","#f43f5e","צילום רחוב","11K"],["sunny_snaps","#f59e0b","שמש וים ☀️","4.4K"],
+      ["mono_mike","#64748b","שחור לבן","2.9K"],["bloom_bea","#22c55e","פרחים ויופי 🌸","13K"],["urban_uri","#a855f7","עיר ואורות 🌃","6.1K"],
+      ["wild_wes","#16a34a","טבע 🌲","9.3K"],["cafe_cleo","#b45309","קפה ומאפים ☕","5.2K"],["sky_sam","#3b82f6","שמיים 🌤️","8.1K"],["retro_rita","#ec4899","וינטג׳ 📼","3.7K"]
+    ].map(mkUser);
+
+
+    // Free sample media: public-domain car films (Prelinger Archives / Internet Archive), SoundHelix music, Picsum photos.
+    // Videos 9-10 reuse two films trimmed to a different segment.
+    const CARS = ["1955Chev1955", "GiveYour1954", "HenryFor1962", "HenryFor1962_2", "American1958", "American1958_2", "American1958_3", "SailingAlong"];
+    const TRACKS = [1, 2, 3].map(n => "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-" + n + ".mp3");
+    const PHOTO_IDS = [[1015, 1016, 1018], [1019, 1020, 1021], [1022, 1023, 1024], [1025, 1027, 1029], [1031, 1032, 1033], [1035, 1036, 1037], [1038, 1039, 1040], [1041, 1042, 1043], [1044, 1045, 1047], [1048, 1049, 1050]];
+    const CAR_LIKES = [1240, 892, 3450, 2103, 567, 4310, 1780, 950, 2760, 640];
+    const PHOTO_LIKES = [5320, 410, 1980, 3320, 760, 2890, 1530, 4410, 260, 3070];
+    const SAMPLE_COMMENTS = ["וואו איזה רכב!", "קלאסיקה אמיתית 😍", "איזה סרטון מדהים", "תודה על השיתוף", "אהבתי את הסאונד"];
+
+    const WORDS_1000 = Array(1000).fill("uploadvid").join(" ");
+    const TOPIC_TAGS = {
+      classic: ["classiccars", "oldtimer", "carshow", "chrome", "vintagecar", "carlife"], family: ["familycar", "roadtrip", "stationwagon", "vacation", "weekend", "kidsfun"],
+      retro: ["retro", "fifties", "americana", "diner", "nostalgia", "oldschool"], race: ["racing", "speed", "engine", "horsepower", "track", "motorsport"],
+      sail: ["sailing", "ocean", "boats", "summer", "waves", "seaside"], nature: ["nature", "forest", "landscape", "mountains", "outdoors", "wild"],
+      city: ["citylights", "street", "urban", "nightlife", "skyline", "downtown"], food: ["foodie", "coffee", "baking", "brunch", "tasty", "homemade"],
+      sky: ["sky", "clouds", "sunset", "golden", "weather", "horizon"], art: ["art", "design", "colors", "creative", "studio", "illustration"]
+    };
+    const TOPIC_C = ["classic", "family", "retro", "race", "sail"], TOPIC_P = ["nature", "city", "food", "sky", "art"];
+    const CAP_LANGS = ["en", "he", "ru", "es", "fr"]; // demo: spoken language of each video
+    const capFor = (t) => WORDS_1000 + " #uploadvid #fyp #viral #trending " + TOPIC_TAGS[t].map(x => "#" + x).join(" "); // 1000 words + 10 tags
+    const videos = [];
+    for (let k = 0; k < 10; k++) {
+      const cid = CARS[k % CARS.length], cu = USERS[k], pu = PHOTO_USERS[k];
+      videos.push({
+        id: 2 * k + 1, username: cu.name, avatar: cu.avatar, bio: cu.bio, fn: cu.fn, caption: capFor(TOPIC_C[k % 5]), topic: TOPIC_C[k % 5], capLang: CAP_LANGS[k % 5], date: Date.now() - (2 * k + 1) * 2 * 864e5,
+        src: "https://archive.org/download/" + cid + "/" + cid + "_512kb.mp4",
+        alt: "https://archive.org/download/" + cid + "/" + cid + ".mp4",
+        edit: k >= CARS.length ? { start: 60, end: 240, speed: 1, filter: "", bright: 1, contrast: 1, sat: 1, flip: false, vol: 1, items: [] } : undefined,
+        likes: CAR_LIKES[k], liked: false, shares: 20 + k * 13,
+        comments: k % 3 === 0 ? [] : [{ text: SAMPLE_COMMENTS[k % 5] }, { text: SAMPLE_COMMENTS[(k + 2) % 5] }],
+        soundId: "c" + (k % 3), orig: k < 3
+      });
+      videos.push({
+        id: 2 * k + 2, type: "photos", username: pu.name, avatar: pu.avatar, bio: pu.bio, fn: pu.fn, caption: capFor(TOPIC_P[k % 5]), topic: TOPIC_P[k % 5], date: Date.now() - (2 * k + 2) * 2 * 864e5,
+        images: PHOTO_IDS[k].map(n => "https://picsum.photos/id/" + n + "/720/1280"), src: TRACKS[k % 3],
+        likes: PHOTO_LIKES[k], liked: false, shares: 10 + k * 7,
+        comments: k % 2 ? [{ text: SAMPLE_COMMENTS[k % 5] }] : [],
+        soundId: "p" + (k % 3), orig: k < 3
+      });
+    }
+    videos.forEach((v, i) => {
+      v.comments.forEach((c, j) => { const w = USERS[(i + j + 1) % 10]; c.user = w.name; c.avatar = w.avatar; });
+    });
+
+    let currentIndex = 0;
+    let startX = 0, startY = 0, isDragging = false;
+    let commentsOpen = false, profileOpen = false, dmOpen = false;
+    let isAnimating = false;
+    let soundOn = false;
+    let userSpeed = null; // playback speed picked from the speed menu
+
+    function gesturesBlocked() {
+      return commentsOpen || profileOpen || dmOpen || livePanel.classList.contains("open") || document.getElementById("sound-panel").classList.contains("open") || document.getElementById("hist-panel").classList.contains("open") || !!document.querySelector(".modal.open");
+    }
+    function setMute(vid, i) {
+      const e = videos[i].edit;
+      vid.muted = !soundOn || !!(e && e.vol === 0);
+    }
+    function rebuildFeed() {
+      hideControls();
+      resetSpeed();
+      container.querySelectorAll("video").forEach(v => { v.pause(); v.removeAttribute("src"); v.load(); });
+      container.innerHTML = "";
+      currentIndex = 0;
+      initVideos();
+    }
+    function addToFeed(v) { videos.unshift(v); rebuildFeed(); }
+
+    const container = document.getElementById("video-container");
+    const avatarImg = document.getElementById("avatar-img");
+    const infoUsername = document.getElementById("info-username");
+    const infoCaption = document.getElementById("info-caption");
+    const commentsList = document.getElementById("comments-list");
+    const commentsPanel = document.getElementById("comments-panel");
+    const profilePanel = document.getElementById("profile-panel");
+    
+
+    // Build video slides
+    function initVideos() {
+      videos.forEach((v, i) => {
+        const slide = document.createElement("div");
+        slide.className = "video-slide" + (i === 0 ? " active" : "");
+        slide.dataset.index = i;
+        slide.dataset.vid = v.id;
+
+        const video = document.createElement("video");
+        video.src = v.src;
+        video.loop = true;
+        video.muted = true;
+        video.playsInline = true;
+        video.setAttribute("playsinline", "");
+        video.disablePictureInPicture = true;
+        video.controls = false;
+        video.controlsList = "nodownload nofullscreen noremoteplayback";
+        video.preload = i === 0 ? "auto" : "metadata";
+        if (v.alt) video.addEventListener("error", () => { if (video.src !== v.alt) video.src = v.alt; }, { once: true });
+
+        slide.appendChild(video);
+        if (v.type === "photos") {
+          video.style.display = "none"; // the "video" only carries the post's music
+          const car = document.createElement("div");
+          car.className = "carousel";
+          car.innerHTML = '<div class="car-track"></div>';
+          v.images.forEach((src, j) => {
+            const im = document.createElement("img");
+            im.alt = ""; im.draggable = false;
+            im.onerror = () => { im.onerror = null; im.src = photoFallback(j); }; // blocked/failed photo: plain gradient, no broken-image frame
+            im.src = src;
+            car.firstChild.appendChild(im);
+          });
+          slide.appendChild(car);
+        }
+        if (v.edit) applyEdit(slide, video, v.edit);
+        container.appendChild(slide);
+      });
+
+      updateUI();
+      playCurrent();
+    }
+
+    function updateUI() {
+      const v = videos[currentIndex];
+      avatarImg.src = v.avatar;
+      infoUsername.textContent = v.username;
+      gid("btn-cc").classList.toggle("on", !!v.capOn);
+      gid("btn-cc").style.display = v.type === "photos" ? "none" : "";
+      renderDots(v);
+      syncCaption(v);
+
+      // likes
+      const likeBtn = document.getElementById("btn-like");
+      const likeCount = document.getElementById("like-count");
+      likeCount.textContent = formatCount(v.likes);
+      likeBtn.classList.toggle("liked", v.liked);
+
+      // comment count
+      const commentCountEl = document.getElementById("comment-count");
+      if (commentCountEl) commentCountEl.textContent = formatCount(v.comments.length);
+
+      // share count
+      const shareCountEl = document.getElementById("share-count");
+      if (shareCountEl) shareCountEl.textContent = formatCount(v.shares || 0);
+
+      // profile data
+      const pv = profileMe ? { avatar: ME.avatar, username: ME.name, bio: ME.bio, fn: ME.fn } : v;
+      document.getElementById("profile-img").src = pv.avatar;
+      document.getElementById("profile-name").textContent = pv.username;
+      document.getElementById("profile-bio").textContent = pv.bio || "";
+      document.getElementById("stat-followers").textContent = ((pv.fn || 0) + (followed.has(pv.username) ? 1 : 0)).toLocaleString();
+      document.getElementById("stat-likes").textContent = formatCount(videos.filter(x => x.username === pv.username).reduce((a, x) => a + x.likes, 0));
+      document.getElementById("stat-following").textContent = profileMe ? followed.size : 312;
+      const fb = document.getElementById("btn-follow");
+      fb.style.display = profileMe ? "none" : "";
+      fb.textContent = followed.has(pv.username) ? "Following" : "Follow";
+      fb.classList.toggle("following", followed.has(pv.username));
+      document.getElementById("btn-live-mp").style.display = profileMe ? "flex" : "none";
+      document.getElementById("stat-videos").textContent = videos.filter(x => x.username === pv.username).length;
+
+      // DM header
+      const dmAvatar = document.getElementById("dm-avatar");
+      const dmName = document.getElementById("dm-name");
+      if (dmAvatar) dmAvatar.src = dmUser().avatar;
+      if (dmName) dmName.textContent = dmUser().username;
+
+      // comments
+      commentsList.innerHTML = "";
+      if (v.comments.length === 0) {
+        commentsList.innerHTML = '<p style="opacity:0.5;text-align:center;padding:40px 0;">אין תגובות עדיין. היה הראשון!</p>';
+      } else {
+        v.comments.forEach(c => {
+          const div = document.createElement("div");
+          div.className = "comment";
+          div.innerHTML = '<div class="comment-avatar"><img alt=""></div><div class="comment-body"><div class="comment-user"></div><div class="comment-text"></div></div>';
+          div.querySelector("img").src = c.avatar;
+          div.querySelector(".comment-user").textContent = "@" + c.user;
+          div.querySelector(".comment-text").textContent = c.text;
+          commentsList.appendChild(div);
+        });
+      }
+
+      }
+
+    function formatCount(n) {
+      if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, "") + "M";
+      if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, "") + "K";
+      return String(n);
+    }
+
+    function playCurrent() {
+      document.querySelectorAll(".video-slide").forEach((slide, i) => {
+        const vid = slide.querySelector("video");
+        if (i === currentIndex) {
+          slide.classList.add("active");
+          setMute(vid, i);
+          applySpeed(vid, i);
+          vid.play().catch(() => {});
+        } else {
+          slide.classList.remove("active");
+          vid.pause();
+        }
+      });
+    }
+
+    function goTo(index, direction) {
+      if (index < 0 || index >= videos.length || index === currentIndex || isAnimating) return;
+      isAnimating = true;
+      hideControls();
+      resetSpeed();
+
+      const slides = document.querySelectorAll(".video-slide");
+      const currentSlide = slides[currentIndex];
+      const nextSlide = slides[index];
+
+      // Clear previous animation classes
+      slides.forEach(s => {
+        s.classList.remove("leaving-up", "leaving-down", "entering-from-bottom", "entering-from-top");
+      });
+
+      if (direction === "up") {
+        // swipe up → current leaves upward, next comes from bottom
+        currentSlide.classList.add("leaving-up");
+        nextSlide.classList.add("entering-from-bottom");
+        void nextSlide.offsetWidth; // force reflow
+        nextSlide.classList.remove("entering-from-bottom");
+        nextSlide.classList.add("active");
+        currentSlide.classList.remove("active");
+      } else if (direction === "down") {
+        currentSlide.classList.add("leaving-down");
+        nextSlide.classList.add("entering-from-top");
+        void nextSlide.offsetWidth;
+        nextSlide.classList.remove("entering-from-top");
+        nextSlide.classList.add("active");
+        currentSlide.classList.remove("active");
+      } else {
+        currentSlide.classList.remove("active");
+        nextSlide.classList.add("active");
+      }
+
+      // pause old video after animation
+      setTimeout(() => {
+        const oldVid = currentSlide.querySelector("video");
+        if (oldVid) {
+          oldVid.pause();
+          oldVid.currentTime = 0;
+        }
+        currentSlide.classList.remove("leaving-up", "leaving-down");
+        isAnimating = false;
+      }, 420);
+
+      currentIndex = index;
+      updateUI();
+
+      const newVid = nextSlide.querySelector("video");
+      if (newVid) { setMute(newVid, index); applySpeed(newVid, index); newVid.play().catch(() => {}); }
+    }
+
+    function photoStep(dir) {
+      const v = videos[currentIndex];
+      v.photoIdx = Math.min(v.images.length - 1, Math.max(0, (v.photoIdx || 0) + dir));
+      const slide = document.querySelectorAll(".video-slide")[currentIndex];
+      slide.querySelector(".car-track").style.transform = "translateX(" + (-v.photoIdx * 100) + "%)";
+      renderDots(v);
+    }
+
+    // main feed: swipe sideways (either way) opens the uploader's profile; on a photo post it first pages through the pictures
+    function horizontalSwipe(dx) {
+      const v = videos[currentIndex];
+      if (v.type === "photos") {
+        const step = dx < 0 ? 1 : -1, n = (v.photoIdx || 0) + step;
+        if (n >= 0 && n < v.images.length) { photoStep(step); return; }
+      }
+      openProfile();
+    }
+
+    function nextVideo() {
+      goTo(Math.min(currentIndex + 1, videos.length - 1), "up");
+    }
+
+    function prevVideo() {
+      goTo(Math.max(currentIndex - 1, 0), "down");
+    }
+
+    // Touch / swipe handling
+    const app = document.getElementById("app");
+
+    app.addEventListener("touchstart", (e) => {
+      if (gesturesBlocked()) return;
+      const t = e.touches[0];
+      startX = t.clientX;
+      startY = t.clientY;
+      isDragging = true;
+    }, { passive: true });
+
+    app.addEventListener("touchend", (e) => {
+      if (!isDragging || gesturesBlocked() || lpFired) return;
+      isDragging = false;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - startX;
+      const dy = t.clientY - startY;
+      const absX = Math.abs(dx);
+      const absY = Math.abs(dy);
+
+      if (absX < 40 && absY < 40) return; // tap
+
+      if (absY > absX) {
+        // vertical
+        if (dy < -50) nextVideo();      // swipe up
+        else if (dy > 50) prevVideo(); // swipe down
+      } else {
+        // horizontal
+        if (absX > 60) horizontalSwipe(dx); // swipe right or left → profile of the uploader
+      }
+    }, { passive: true });
+
+    // Mouse support for desktop testing
+    let mouseDown = false;
+    app.addEventListener("mousedown", (e) => {
+      if (gesturesBlocked()) return;
+      startX = e.clientX;
+      startY = e.clientY;
+      mouseDown = true;
+    });
+    app.addEventListener("mouseup", (e) => {
+      if (!mouseDown) return;
+      mouseDown = false;
+      if (lpFired) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      const absX = Math.abs(dx);
+      const absY = Math.abs(dy);
+      if (absX < 30 && absY < 30) return;
+      if (absY > absX) {
+        if (dy < -40) nextVideo();
+        else if (dy > 40) prevVideo();
+      } else {
+        if (absX > 50) horizontalSwipe(dx);
+      }
+    });
+
+    // Logo bounce helper
+    function bounceLogo(el, className = "animating") {
+      if (!el) return;
+      el.classList.remove(className);
+      void el.offsetWidth;
+      el.classList.add(className);
+      setTimeout(() => el.classList.remove(className), 500);
+    }
+
+    // Buttons
+    document.getElementById("user-avatar").addEventListener("click", () => {
+      bounceLogo(document.getElementById("user-avatar"));
+      openProfile();
+    });
+
+    function toggleLike() {
+      const v = videos[currentIndex];
+      const btn = document.getElementById("btn-like");
+      v.liked = !v.liked;
+      v.likes += v.liked ? 1 : -1;
+      if (v.liked) interact(v, 3);
+      updateUI();
+      bounceLogo(btn, "like-animate");
+      bounceLogo(btn, "animating");
+      return v.liked;
+    }
+    document.getElementById("btn-like").addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleLike();
+    });
+
+    document.getElementById("btn-share").addEventListener("click", (e) => {
+      e.stopPropagation();
+      bounceLogo(document.getElementById("btn-share"), "animating-share");
+      const v = videos[currentIndex];
+      v.shares = (v.shares || 0) + 1;
+      interact(v, 4);
+      updateUI();
+      openShare();
+    });
+
+    document.getElementById("btn-comments").addEventListener("click", (e) => {
+      e.stopPropagation();
+      bounceLogo(document.getElementById("btn-comments"));
+      openComments();
+    });
+
+    document.getElementById("btn-search").addEventListener("click", () => {
+      bounceLogo(document.getElementById("btn-search"));
+      document.getElementById("search-modal").classList.add("open");
+    });
+
+    // Settings moved into profile
+    document.getElementById("btn-settings-profile").addEventListener("click", () => {
+      document.getElementById("settings-modal").classList.add("open");
+    });
+
+    // Live / Camera
+    document.getElementById("btn-live").addEventListener("click", (e) => {
+      e.stopPropagation();
+      bounceLogo(document.getElementById("btn-live"));
+      openLive();
+    });
+    document.getElementById("close-live").addEventListener("click", closeLive);
+    document.getElementById("btn-flip-camera").addEventListener("click", flipCamera);
+    document.getElementById("btn-take-photo").addEventListener("click", takePhoto);
+    document.getElementById("btn-record-video").addEventListener("click", toggleRecord);
+    document.getElementById("btn-go-live").addEventListener("click", toggleGoLive);
+
+    document.getElementById("close-comments").addEventListener("click", closeComments);
+    document.getElementById("close-profile").addEventListener("click", closeProfile);
+    document.getElementById("close-dm").addEventListener("click", closeDM);
+
+    document.querySelectorAll("[data-close]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.close;
+        document.getElementById(id).classList.remove("open");
+      });
+    });
+
+    // also close modals by clicking outside box
+    document.querySelectorAll(".modal").forEach(m => {
+      m.addEventListener("click", (e) => {
+        if (e.target === m) m.classList.remove("open");
+      });
+    });
+
+    const uiOverlay = document.getElementById("ui-overlay");
+    const dmPanel = document.getElementById("dm-panel");
+    const dmMessages = document.getElementById("dm-messages");
+
+    // Simple per-user mock conversation history
+    const dmHistory = {};
+
+    function openComments() {
+      commentsOpen = true;
+      commentsPanel.classList.add("open");
+      uiOverlay.classList.add("dimmed");
+    }
+    function closeComments() {
+      commentsOpen = false;
+      commentsPanel.classList.remove("open");
+      uiOverlay.classList.remove("dimmed");
+    }
+    function openProfile() {
+      profileOpen = true;
+      profilePanel.classList.add("open");
+      uiOverlay.classList.add("dimmed");
+    }
+    function closeProfile() {
+      closeInbox();
+      if (profileMe) { profileMe = false; setTimeout(updateUI, 400); }
+      profileOpen = false;
+      profilePanel.classList.remove("open");
+      uiOverlay.classList.remove("dimmed");
+    }
+
+    let dmTarget = null; // set when a chat is opened from the inbox
+    function dmUser() { return dmTarget || videos[currentIndex]; }
+    function openDM(target) {
+      dmTarget = target && target.username ? target : null;
+      dmOpen = true;
+      const v = dmUser();
+      document.getElementById("dm-avatar").src = v.avatar;
+      document.getElementById("dm-name").textContent = v.username;
+      // load or create conversation
+      if (!dmHistory[v.username]) {
+        dmHistory[v.username] = [
+          { from: "them", text: "היי! תודה שצפית בסרטון 😊", time: "עכשיו" }
+        ];
+      }
+      renderDM(v.username);
+      dmPanel.classList.add("open");
+      uiOverlay.classList.add("dimmed");
+    }
+    function closeDM() {
+      const backToInbox = !!dmTarget && profileOpen;
+      dmTarget = null;
+      if (backToInbox) openInbox();
+      dmOpen = false;
+      dmPanel.classList.remove("open");
+      uiOverlay.classList.remove("dimmed");
+    }
+
+    function renderDM(username) {
+      const msgs = dmHistory[username] || [];
+      dmMessages.innerHTML = "";
+      if (msgs.length === 0) {
+        dmMessages.innerHTML = '<p style="opacity:0.5;text-align:center;padding:40px 0;font-size:14px;">התחל שיחה פרטית מוצפנת</p>';
+        return;
+      }
+      msgs.forEach(m => {
+        const div = document.createElement("div");
+        div.className = "dm-msg " + (m.from === "me" ? "me" : "them");
+        div.textContent = m.text;
+        const tm = document.createElement("div");
+        tm.className = "dm-time";
+        tm.textContent = m.time;
+        div.appendChild(tm);
+        dmMessages.appendChild(div);
+      });
+      dmMessages.scrollTop = dmMessages.scrollHeight;
+    }
+
+    document.getElementById("send-dm").addEventListener("click", () => {
+      const input = document.getElementById("dm-input");
+      const text = input.value.trim();
+      if (!text) return;
+      const v = dmUser();
+      if (!dmHistory[v.username]) dmHistory[v.username] = [];
+      dmHistory[v.username].push({
+        from: "me",
+        text: text,
+        time: "עכשיו"
+      });
+      input.value = "";
+      renderDM(v.username);
+    });
+
+    // ===== Live / Camera =====
+    let liveStream = null;
+    let facingMode = "environment"; // rear camera first
+    let isLive = false;
+    let isRecording = false;
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    const livePanel = document.getElementById("live-panel");
+    const livePreview = document.getElementById("live-preview");
+    const liveBadge = document.getElementById("live-badge");
+
+    async function startCamera() {
+      stopCamera();
+      try {
+        liveStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: facingMode },
+          audio: true
+        });
+        livePreview.srcObject = liveStream;
+      } catch (err) {
+        alert("לא ניתן לגשת למצלמה: " + (err.message || "הרשאה נדחתה"));
+      }
+    }
+
+    function stopCamera() {
+      if (liveStream) {
+        liveStream.getTracks().forEach(t => t.stop());
+        liveStream = null;
+      }
+      livePreview.srcObject = null;
+    }
+
+    async function flipCamera() {
+      facingMode = facingMode === "environment" ? "user" : "environment";
+      await startCamera();
+    }
+
+    function openLive() {
+      livePanel.classList.add("open");
+      startCamera();
+    }
+
+    function closeLive() {
+      if (isLive) toggleGoLive();
+      if (isRecording) toggleRecord();
+      stopCamera();
+      livePanel.classList.remove("open");
+    }
+
+    function takePhoto() {
+      if (!liveStream) return;
+      const canvas = document.createElement("canvas");
+      canvas.width = livePreview.videoWidth || 720;
+      canvas.height = livePreview.videoHeight || 1280;
+      canvas.getContext("2d").drawImage(livePreview, 0, 0);
+      canvas.toBlob((blob) => {
+        const url = URL.createObjectURL(blob);
+        ME.avatar = url;
+        videos.forEach(v => { if (v.username === ME.name) v.avatar = url; });
+        updateUI();
+      }, "image/jpeg", 0.9);
+    }
+
+    function toggleRecord() {
+      const btn = document.getElementById("btn-record-video");
+      if (!isRecording) {
+        if (!liveStream) return;
+        recordedChunks = [];
+        try {
+          mediaRecorder = new MediaRecorder(liveStream, { mimeType: "video/webm" });
+        } catch {
+          mediaRecorder = new MediaRecorder(liveStream);
+        }
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) recordedChunks.push(e.data);
+        };
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(recordedChunks, { type: (mediaRecorder && mediaRecorder.mimeType) || "video/webm" });
+          const url = URL.createObjectURL(blob);
+          addToFeed({ id: Date.now(), date: Date.now(), soundId: "s" + Date.now(), orig: true, src: url, username: ME.name, avatar: ME.avatar, bio: ME.bio, fn: ME.fn,
+            caption: LANG === "en" ? "New video from camera 🎥" : "סרטון חדש מהמצלמה 🎥", likes: 0, liked: false, shares: 0, comments: [] });
+        };
+        mediaRecorder.start();
+        isRecording = true;
+        btn.classList.add("recording");
+        btn.textContent = "⏹ עצור";
+      } else {
+        mediaRecorder.stop();
+        isRecording = false;
+        btn.classList.remove("recording");
+        btn.textContent = "🎥 וידאו";
+      }
+    }
+
+    let liveStartedAt = null;
+    function toggleGoLive() {
+      const btn = document.getElementById("btn-go-live");
+      if (!isLive) {
+        if (!liveStream) return;
+        isLive = true;
+        liveStartedAt = Date.now();
+        liveBadge.style.display = "block";
+        liveBadge.textContent = "🔴 LIVE (" + fmtDate(liveStartedAt) + ")";
+        btn.textContent = "⏹ סיים Live";
+      } else {
+        isLive = false;
+        liveStartedAt = null;
+        liveBadge.style.display = "none";
+        liveBadge.textContent = "🔴 LIVE";
+        btn.textContent = "🔴 התחל Live";
+      }
+    }
+
+    // ===== Create (video editor) =====
+    const MAX_SEC = 3600; // 60 minutes
+    const gid = (id) => document.getElementById(id);
+    const FILTERS = { "רגיל": "", "חי": "saturate(1.5) contrast(1.1)", "חם": "sepia(.3) saturate(1.3) hue-rotate(-10deg)", "קר": "hue-rotate(15deg) saturate(1.1) brightness(1.05)", "שחור-לבן": "grayscale(1)", "וינטג׳": "sepia(.6) contrast(.9)", "דהוי": "contrast(.85) brightness(1.1) saturate(.8)", "דרמטי": "contrast(1.4) saturate(1.2) brightness(.9)" };
+    const crPanel = gid("create-panel"), crVideo = gid("cr-video"), crOv = gid("cr-ov");
+    let E = null, crUrl = null, crTextColor = "#ffffff";
+    const newEdit = (d) => ({ start: 0, end: d, speed: 1, filter: "", bright: 1, contrast: 1, sat: 1, flip: false, vol: 1, items: [] });
+    const cssFilter = (e) => `${e.filter} brightness(${e.bright}) contrast(${e.contrast}) saturate(${e.sat})`;
+
+    function fmt(s) {
+      s = Math.max(0, Math.round(s));
+      const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), c = s % 60;
+      return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(c).padStart(2, "0");
+    }
+
+    function drawItems(el, items, drag) {
+      el.innerHTML = "";
+      items.forEach((it) => {
+        const d = document.createElement("div");
+        d.className = "ov-item";
+        d.textContent = it.t;
+        d.style.cssText = `left:${it.x}%;top:${it.y}%;color:${it.c || "#fff"};font-size:${it.s}cqw`;
+        if (drag) {
+          d.onpointerdown = (ev) => {
+            ev.preventDefault();
+            d.setPointerCapture(ev.pointerId);
+            const r = el.getBoundingClientRect();
+            d.onpointermove = (m) => {
+              it.x = Math.min(95, Math.max(5, (m.clientX - r.left) / r.width * 100));
+              it.y = Math.min(95, Math.max(5, (m.clientY - r.top) / r.height * 100));
+              d.style.left = it.x + "%"; d.style.top = it.y + "%";
+            };
+            d.onpointerup = () => { d.onpointermove = null; };
+          };
+        }
+        el.appendChild(d);
+      });
+    }
+
+    function applyEdit(slide, video, e) {
+      video.style.filter = cssFilter(e);
+      if (e.flip) video.style.transform = "scaleX(-1)";
+      video.defaultPlaybackRate = e.speed; video.playbackRate = e.speed;
+      video.volume = e.vol; video.muted = e.vol === 0;
+      video.addEventListener("loadedmetadata", () => { video.currentTime = e.start; });
+      video.addEventListener("play", () => { video.playbackRate = userSpeed || e.speed; });
+      video.addEventListener("timeupdate", () => {
+        if (video.currentTime >= e.end || video.currentTime < e.start - 0.3) video.currentTime = e.start;
+      });
+      const layer = document.createElement("div");
+      layer.className = "ov-layer";
+      drawItems(layer, e.items, false);
+      slide.appendChild(layer);
+    }
+
+    function renderCr() {
+      if (!E) return;
+      crVideo.style.filter = cssFilter(E);
+      crVideo.style.transform = E.flip ? "scaleX(-1)" : "";
+      crVideo.playbackRate = E.speed; crVideo.volume = E.vol; crVideo.muted = E.vol === 0;
+      gid("cr-len").textContent = `${fmt(E.start)} – ${fmt(E.end)} • ${LANG === "en" ? "length" : "אורך"} ${fmt((E.end - E.start) / E.speed)}`;
+      drawItems(crOv, E.items, true);
+    }
+
+    function chips(id, list, onIdx, pick) {
+      const el = gid(id);
+      list.forEach(([label, val], i) => {
+        const b = document.createElement("button");
+        b.className = "chip" + (i === onIdx ? " on" : "");
+        b.textContent = label;
+        if (typeof val === "string" && val[0] === "#") b.style.color = val;
+        b.onclick = () => { pick(val); el.querySelectorAll(".chip").forEach(x => x.classList.toggle("on", x === b)); renderCr(); };
+        el.appendChild(b);
+      });
+    }
+    chips("cr-speed", [["0.25x", .25], ["0.5x", .5], ["1x", 1], ["1.5x", 1.5], ["2x", 2], ["3x", 3]], 2, v => { if (E) E.speed = v; });
+    chips("cr-filters", Object.entries(FILTERS), 0, v => { if (E) E.filter = v; });
+    chips("cr-colors", ["#ffffff", "#ffe14d", "#fe2c55", "#2dd4bf", "#4da3ff", "#000000"].map(c => ["●", c]), 0, v => { crTextColor = v; });
+
+    function addItem(o) {
+      if (!E) { alert("העלה סרטון קודם"); return; }
+      E.items.push({ x: 50, y: 45, c: crTextColor, ...o });
+      renderCr();
+    }
+    ["😂", "❤️", "🔥", "😍", "👍", "🎉", "⭐", "💯", "😎", "🥳", "✨", "🎵"].forEach(s => {
+      const b = document.createElement("button");
+      b.className = "chip"; b.textContent = s;
+      b.onclick = () => addItem({ t: s, s: 16 });
+      gid("cr-stk").appendChild(b);
+    });
+    gid("cr-addtext").onclick = () => {
+      const t = gid("cr-text").value.trim();
+      if (t) { addItem({ t, s: 9 }); gid("cr-text").value = ""; }
+    };
+    gid("cr-undo").onclick = () => { if (E) { E.items.pop(); renderCr(); } };
+
+    function bindRange(id, fn) { gid(id).oninput = (ev) => { if (!E) return; fn(+ev.target.value); renderCr(); }; }
+    bindRange("cr-start", v => { E.start = Math.min(v, E.end - 0.5); crVideo.currentTime = E.start; });
+    bindRange("cr-end", v => { E.end = Math.max(v, E.start + 0.5); });
+    bindRange("cr-bright", v => { E.bright = v; });
+    bindRange("cr-contrast", v => { E.contrast = v; });
+    bindRange("cr-sat", v => { E.sat = v; });
+    bindRange("cr-vol", v => { E.vol = v; });
+    gid("cr-flip").onclick = () => { if (E) { E.flip = !E.flip; renderCr(); } };
+    gid("cr-reset").onclick = () => {
+      if (!E) return;
+      Object.assign(E, { bright: 1, contrast: 1, sat: 1, filter: "", flip: false });
+      ["cr-bright", "cr-contrast", "cr-sat"].forEach(i => { gid(i).value = 1; });
+      renderCr();
+    };
+    crVideo.ontimeupdate = () => {
+      if (E && (crVideo.currentTime >= E.end || crVideo.currentTime < E.start - 0.3)) crVideo.currentTime = E.start;
+    };
+
+    document.querySelectorAll("#cr-tabs button").forEach(b => {
+      b.onclick = () => {
+        document.querySelectorAll("#cr-tabs button").forEach(x => x.classList.toggle("on", x === b));
+        document.querySelectorAll(".cr-pane").forEach(p => p.classList.toggle("show", p.id === "pane-" + b.dataset.t));
+      };
+    });
+
+    function loadInEditor(url, d) {
+      if (crUrl) URL.revokeObjectURL(crUrl);
+      crUrl = url; E = newEdit(d);
+      crVideo.src = url;
+      ["cr-start", "cr-end"].forEach(i => { const r = gid(i); r.max = d; r.step = 0.1; });
+      gid("cr-start").value = 0; gid("cr-end").value = d;
+      ["cr-bright", "cr-contrast", "cr-sat", "cr-vol"].forEach(i => { gid(i).value = 1; });
+      gid("cr-hint").style.display = "none";
+      renderCr();
+      crVideo.play().catch(() => {});
+    }
+
+    gid("cr-file").onchange = (ev) => {
+      const f = ev.target.files[0];
+      ev.target.value = "";
+      if (!f) return;
+      if (!f.type.startsWith("video/")) { alert("יש לבחור קובץ וידאו"); return; }
+      const url = URL.createObjectURL(f);
+      const t = document.createElement("video");
+      t.preload = "metadata";
+      t.onloadedmetadata = () => {
+        const d = t.duration;
+        if (!isFinite(d) || d <= 0) { alert("לא ניתן לקרוא את אורך הסרטון"); URL.revokeObjectURL(url); return; }
+        if (d > MAX_SEC) { alert("הסרטון ארוך מדי (" + fmt(d) + "). אפשר להעלות עד 60 דקות."); URL.revokeObjectURL(url); return; }
+        loadInEditor(url, d);
+      };
+      t.onerror = () => { alert("לא ניתן לקרוא את הקובץ"); URL.revokeObjectURL(url); };
+      t.src = url;
+    };
+
+    function closeCreate(keep) {
+      crPanel.classList.remove("open");
+      crVideo.pause();
+      if (!keep && crUrl) URL.revokeObjectURL(crUrl);
+      E = null; crUrl = null;
+      crVideo.removeAttribute("src"); crVideo.load();
+      gid("cr-hint").style.display = "";
+      crOv.innerHTML = ""; gid("cr-len").textContent = ""; gid("cr-caption").value = ""; gid("cr-wc").textContent = "0/1000 • #0/10";
+    }
+    gid("btn-create").onclick = () => crPanel.classList.add("open");
+    gid("cr-close").onclick = () => closeCreate(false);
+    gid("cr-publish").onclick = () => {
+      if (!E) { alert("העלה סרטון קודם"); return; }
+      videos.unshift({
+        id: Date.now(), date: Date.now(), soundId: "s" + Date.now(), orig: true, src: crUrl, username: ME.name, avatar: ME.avatar, bio: ME.bio, fn: ME.fn,
+        caption: gid("cr-caption").value.trim() || (LANG === "en" ? "New video ✂️" : "סרטון חדש ✂️"),
+        likes: 0, liked: false, shares: 0, comments: [], edit: JSON.parse(JSON.stringify(E))
+      });
+      closeCreate(true);
+      closeLive();
+      rebuildFeed();
+    };
+    // keep editor gestures/keys from triggering feed swipes & shortcuts
+    ["touchstart", "touchend", "mousedown", "mouseup", "keydown"].forEach(t => crPanel.addEventListener(t, e => e.stopPropagation()));
+
+    // ===== Language (Hebrew / English) =====
+    const EN = {
+      "פרסומת": "Ad", "חוויה בלי פרסומות • שדרוג עכשיו": "Ad-free experience • Upgrade now", "תיאור הסרטון...": "Video description...",
+      "UploadVid – העלה ושתף": "UploadVid – Upload & share", "האפליקציה שלך לסרטונים קצרים": "Your app for short videos",
+      "תגובות": "Comments", "שלח": "Send", "שם משתמש": "Username", "🔒 הודעה מוצפנת מקצה לקצה": "🔒 End-to-end encrypted message",
+      "פרופיל": "Profile", "ביו של המשתמש יופיע כאן. אוהב לצלם רגעים יומיומיים ולשתף עם העולם.": "User bio will appear here. Loves capturing everyday moments and sharing them with the world.",
+      "סרטונים": "Videos", "עוקבים": "Followers", "עוקב אחרי": "Following", "מצלמה / Live": "Camera / Live",
+      "📷 תמונה": "📷 Photo", "🎥 וידאו": "🎥 Video", "🔴 התחל Live": "🔴 Go Live", "⏹ סיים Live": "⏹ End Live", "⏹ עצור": "⏹ Stop",
+      "פרסם": "Publish", "העלה סרטון כדי להתחיל לערוך": "Upload a video to start editing", "(עד 60 דקות)": "(up to 60 minutes)",
+      "⬆️ העלה סרטון": "⬆️ Upload video", "↩️ מחק אחרון": "↩️ Undo last", "✂️ חיתוך": "✂️ Trim", "⏩ מהירות": "⏩ Speed",
+      "🎨 פילטרים": "🎨 Filters", "🎚️ כוונון": "🎚️ Adjust", "Aa טקסט": "Aa Text", "😊 סטיקרים": "😊 Stickers", "🔊 סאונד": "🔊 Sound",
+      "התחלה": "Start", "סוף": "End", "בהירות": "Brightness", "ניגודיות": "Contrast", "רוויה": "Saturation", "↔️ הפוך": "↔️ Flip",
+      "אפס": "Reset", "➕ הוסף טקסט": "➕ Add text", "עוצמת קול (0 = השתק)": "Volume (0 = mute)", "חיפוש": "Search", "חפש": "Search",
+      "הגדרות": "Settings", "גרסה ראשונית של UploadVid": "UploadVid initial version", "סגור": "Close",
+      "הפרופיל שלי": "My profile", "לייק": "Like", "שיתוף": "Share", "פרופיל המשתמש": "User profile", "כתוב תגובה...": "Write a comment...",
+      "הודעה פרטית מוצפנת...": "Encrypted private message...", "הפוך מצלמה": "Flip camera", "כיתוב לסרטון...": "Video caption...",
+      "כתוב טקסט...": "Write text...", "חפש סרטונים או משתמשים...": "Search videos or users...",
+      "אין תגובות עדיין. היה הראשון!": "No comments yet. Be the first!", "התחל שיחה פרטית מוצפנת": "Start an encrypted private chat",
+      "היי! תודה שצפית בסרטון 😊": "Hi! Thanks for watching the video 😊", "עכשיו": "now",
+      "רגיל": "Normal", "חי": "Vivid", "חם": "Warm", "קר": "Cool", "שחור-לבן": "B&W", "וינטג׳": "Vintage", "דהוי": "Faded", "דרמטי": "Dramatic",
+      "מאמנת כושר 💪": "Fitness coach 💪", "אוהב לבשל ולטייל": "Loves cooking and hiking", "ציורים ואמנות דיגיטלית 🎨": "Paintings & digital art 🎨",
+      "מפיק מוזיקה 🎧": "Music producer 🎧", "מטייל בעולם ✈️": "World traveler ✈️", "שפית ביתית 🍝": "Home chef 🍝",
+      "גיימר ויוטיובר 🎮": "Gamer & YouTuber 🎮", "רקדנית 💃": "Dancer 💃", "הכלב שלי הוא הכוכב 🐶": "My dog is the star 🐶", "עשה זאת בעצמך 🔨": "DIY 🔨"
+    };
+    const AL = [["לא ניתן לגשת למצלמה", "Cannot access the camera"], ["הרשאה נדחתה", "Permission denied"], ["הקישור הועתק ללוח", "Link copied to clipboard"],
+      ["העלה סרטון קודם", "Upload a video first"], ["יש לבחור קובץ וידאו", "Please choose a video file"], ["לא ניתן לקרוא את אורך הסרטון", "Cannot read the video length"],
+      ["לא ניתן לקרוא את הקובץ", "Cannot read the file"], ["הסרטון ארוך מדי", "Video is too long"], ["אפשר להעלות עד 60 דקות", "You can upload up to 60 minutes"]];
+    let LANG = "he";
+    try { LANG = localStorage.getItem("uv_lang") === "en" ? "en" : "he"; } catch (e) {}
+    const origText = new WeakMap(), origAttr = new WeakMap();
+
+    const _alert = window.alert.bind(window);
+    window.alert = (m) => _alert(LANG === "en" ? AL.reduce((t, [h, e]) => t.split(h).join(e), String(m)) : m);
+
+    function tNode(n) {
+      if (n.nodeType === 3) {
+        const v = n.nodeValue;
+        if (LANG === "en") {
+          const m = v.match(/^(\s*)([\s\S]*?)(\s*)$/);
+          if (EN[m[2]] !== undefined) { origText.set(n, v); n.nodeValue = m[1] + EN[m[2]] + m[3]; }
+        } else if (origText.has(n)) { n.nodeValue = origText.get(n); origText.delete(n); }
+      } else if (n.nodeType === 1) {
+        if (n.tagName === "SCRIPT" || n.tagName === "STYLE") return;
+        ["placeholder", "title", "aria-label"].forEach(a => {
+          if (!n.hasAttribute(a)) return;
+          const saved = origAttr.get(n) || {};
+          if (LANG === "en") {
+            const v = n.getAttribute(a);
+            if (EN[v] !== undefined) { saved[a] = v; origAttr.set(n, saved); n.setAttribute(a, EN[v]); }
+          } else if (saved[a] !== undefined) { n.setAttribute(a, saved[a]); delete saved[a]; }
+        });
+        n.childNodes.forEach(tNode);
+      }
+    }
+    new MutationObserver((ms) => ms.forEach(m => {
+      if (m.type === "characterData") tNode(m.target);
+      else m.addedNodes.forEach(tNode);
+    })).observe(document.body, { childList: true, subtree: true, characterData: true });
+
+    function applyLang(l) {
+      LANG = l;
+      document.documentElement.lang = l;
+      document.documentElement.dir = l === "en" ? "ltr" : "rtl";
+      tNode(document.body);
+      gid("lang-he").classList.toggle("on", l === "he");
+      gid("lang-en").classList.toggle("on", l === "en");
+      try { localStorage.setItem("uv_lang", l); } catch (e) {}
+      if (E) renderCr();
+      refreshLang();
+    }
+    gid("lang-he").addEventListener("click", () => applyLang("he"));
+    gid("lang-en").addEventListener("click", () => applyLang("en"));
+
+    // My profile (MP button)
+    let profileMe = false;
+    document.getElementById("btn-mp").addEventListener("click", (e) => {
+      e.stopPropagation();
+      bounceLogo(document.getElementById("btn-mp"));
+      profileMe = true;
+      updateUI();
+      openProfile();
+    });
+
+    // ===== DM inbox =====
+    Object.assign(EN, {
+      "הודעות": "Messages", "מה שלומך?": "How are you?", "אהבתי את הסרטון האחרון 🔥": "Loved your latest video 🔥", "נדבר מאוחר יותר": "Talk later",
+      "תודה רבה!": "Thank you!", "שלחת לי את הקישור?": "Did you send me the link?", "איזה כיף!": "So fun!", "בוא נעשה קולאב 🎬": "Let's collab 🎬",
+      "נשמע טוב 👍": "Sounds good 👍", "מחר מתאים לך?": "Does tomorrow work?", "5 ד׳": "5m", "12 ד׳": "12m", "שעה": "1h", "2 ש׳": "2h",
+      "3 ש׳": "3h", "אתמול": "Yesterday", "יום ב׳": "Mon", "שבוע": "1w"
+    });
+    const DM_SAMPLES = ["היי! תודה שצפית בסרטון 😊", "מה שלומך?", "אהבתי את הסרטון האחרון 🔥", "נדבר מאוחר יותר", "תודה רבה!", "שלחת לי את הקישור?", "איזה כיף!", "בוא נעשה קולאב 🎬", "נשמע טוב 👍", "מחר מתאים לך?"];
+    const DM_TIMES = ["עכשיו", "5 ד׳", "12 ד׳", "שעה", "2 ש׳", "3 ש׳", "אתמול", "אתמול", "יום ב׳", "שבוע"];
+    const inboxPanel = document.getElementById("inbox-panel");
+
+    function renderInbox() {
+      const list = document.getElementById("inbox-list");
+      list.innerHTML = "";
+      USERS.forEach((u, i) => {
+        const h = dmHistory[u.name];
+        const last = h && h.length ? h[h.length - 1] : null;
+        const row = document.createElement("div");
+        row.className = "inbox-row";
+        row.innerHTML = '<img alt=""><div class="inbox-txt"><div class="inbox-name"></div><div class="inbox-last"></div></div><div class="inbox-time"></div>';
+        row.querySelector("img").src = u.avatar;
+        row.querySelector(".inbox-name").textContent = u.name;
+        row.querySelector(".inbox-last").textContent = last ? (last.from === "me" ? (LANG === "en" ? "You: " : "אתה: ") : "") + last.text : DM_SAMPLES[i];
+        row.querySelector(".inbox-time").textContent = last ? last.time : DM_TIMES[i];
+        row.onclick = () => { closeInbox(); openDM({ username: u.name, avatar: u.avatar }); };
+        list.appendChild(row);
+      });
+    }
+    function openInbox() { renderInbox(); inboxPanel.classList.add("open"); }
+    function closeInbox() { inboxPanel.classList.remove("open"); }
+    // my profile: all conversations; anyone else: the chat with that user
+    document.getElementById("btn-inbox").addEventListener("click", () => { if (profileMe) openInbox(); else openDM(); });
+    document.getElementById("close-inbox").addEventListener("click", closeInbox);
+
+    // ===== Player gestures: tap / double-tap / long-press / seek / speed =====
+    Object.assign(EN, { "אפשרויות": "Options", "💾 שמור לטלפון": "💾 Save to phone", "↗️ שתף": "↗️ Share", "מהירות": "Speed" });
+    const seek = gid("seek"), tCur = gid("t-cur"), tDur = gid("t-dur"), speedMenu = gid("speed-menu"), vc = gid("video-container");
+    let ctrlTimer = null, syncTimer = null, scrubbing = false;
+    const curVid = () => document.querySelector(".video-slide.active video");
+
+    function applySpeed(vid, i) {
+      const e = videos[i].edit;
+      vid.playbackRate = userSpeed || (e ? e.speed : 1);
+    }
+    function bounds(v) {
+      const d = isFinite(v.duration) ? v.duration : (v.seekable.length ? v.seekable.end(v.seekable.length - 1) : 0);
+      const e = videos[currentIndex].edit;
+      return e ? [e.start, Math.min(e.end, d || e.end)] : [0, d];
+    }
+    function syncSeek() {
+      const v = curVid();
+      if (!v || scrubbing) return;
+      const [lo, hi] = bounds(v), span = Math.max(hi - lo, 0.001);
+      const c = Math.min(Math.max(v.currentTime - lo, 0), span);
+      setSeekUI(c / span);
+      tCur.textContent = fmt(c);
+      tDur.textContent = fmt(span);
+    }
+    function keepControls() { clearTimeout(ctrlTimer); ctrlTimer = setTimeout(() => (scrubbing ? keepControls() : hideControls()), 3000); }
+    function showControls() {
+      uiOverlay.classList.add("ctrl-on");
+      syncSeek();
+      clearInterval(syncTimer);
+      syncTimer = setInterval(syncSeek, 200);
+      keepControls();
+    }
+    function hideControls() {
+      uiOverlay.classList.remove("ctrl-on");
+      speedMenu.classList.remove("open");
+      clearInterval(syncTimer);
+      clearTimeout(ctrlTimer);
+      scrubbing = false;
+    }
+
+    function setSeekUI(f) {
+      gid("seek-fill").style.width = (f * 100) + "%";
+      gid("seek-thumb").style.left = (f * 100) + "%";
+    }
+    let wasPlaying = false;
+    function seekFromX(x) {
+      const v = curVid();
+      if (!v) return;
+      const r = seek.getBoundingClientRect(), f = Math.min(1, Math.max(0, (x - r.left) / r.width));
+      const [lo, hi] = bounds(v);
+      v.currentTime = lo + (hi - lo) * f;
+      setSeekUI(f);
+      tCur.textContent = fmt((hi - lo) * f);
+    }
+    // grab the bar or the dot and drag: the pointer stays captured until it is released
+    seek.addEventListener("pointerdown", (e) => {
+      const v = curVid();
+      scrubbing = true; seek.classList.add("drag");
+      seek.setPointerCapture(e.pointerId);
+      wasPlaying = !!v && !v.paused;
+      if (v) v.pause();
+      seekFromX(e.clientX); keepControls();
+      e.preventDefault();
+    });
+    seek.addEventListener("pointermove", (e) => { if (scrubbing) { seekFromX(e.clientX); keepControls(); } });
+    ["pointerup", "pointercancel"].forEach(t => seek.addEventListener(t, () => {
+      if (!scrubbing) return;
+      scrubbing = false; seek.classList.remove("drag");
+      const v = curVid();
+      if (v && wasPlaying) v.play().catch(() => {});
+      keepControls();
+    }));
+
+    gid("btn-speed").addEventListener("click", (e) => { e.stopPropagation(); speedMenu.classList.toggle("open"); keepControls(); });
+    speedMenu.querySelectorAll("button").forEach(b => b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      userSpeed = +b.dataset.s;
+      speedMenu.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+      const v = curVid();
+      if (v) applySpeed(v, currentIndex);
+      speedMenu.classList.remove("open");
+      keepControls();
+    }));
+    // keep the player UI from triggering feed swipes
+    [gid("player-ctrl"), gid("btn-speed"), gid("btn-cc"), speedMenu].forEach(el =>
+      ["touchstart", "touchend", "mousedown", "mouseup"].forEach(t => el.addEventListener(t, e => e.stopPropagation())));
+
+    function heartBurst(x, y) {
+      const r = uiOverlay.getBoundingClientRect(), h = document.createElement("div");
+      h.className = "heart-burst";
+      h.textContent = "❤️";
+      h.style.left = (x - r.left) + "px";
+      h.style.top = (y - r.top) + "px";
+      uiOverlay.appendChild(h);
+      setTimeout(() => h.remove(), 750);
+    }
+
+    // tap = controls, double tap = like, long press in the middle = save / share menu
+    let px = 0, py = 0, lpTimer = null, lpFired = false, tapTimer = null;
+    vc.addEventListener("pointerdown", (e) => {
+      px = e.clientX; py = e.clientY; lpFired = false;
+      clearTimeout(lpTimer);
+      if (gesturesBlocked()) return;
+      const r = vc.getBoundingClientRect(), fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
+      const side = fx < 0.3 ? "left" : fx > 0.7 ? "right" : (fy >= 0.2 && fy <= 0.8 ? "mid" : null);
+      if (!side) return;
+      lpTimer = setTimeout(() => {
+        lpFired = true; hideControls();
+        if (side === "mid") gid("lp-modal").classList.add("open"); else startHold(side);
+      }, side === "mid" ? 550 : 400);
+    });
+    vc.addEventListener("pointermove", (e) => {
+      if (lpTimer && Math.hypot(e.clientX - px, e.clientY - py) > 12) { clearTimeout(lpTimer); lpTimer = null; }
+    });
+    ["pointerup", "pointercancel", "pointerleave"].forEach(t => vc.addEventListener(t, () => { clearTimeout(lpTimer); lpTimer = null; endHold(); }));
+    vc.addEventListener("contextmenu", (e) => e.preventDefault());
+    vc.addEventListener("click", (e) => {
+      if (lpFired || gesturesBlocked() || Math.hypot(e.clientX - px, e.clientY - py) > 12) return;
+      if (tapTimer) {
+        clearTimeout(tapTimer); tapTimer = null;
+        if (toggleLike()) heartBurst(e.clientX, e.clientY);
+        return;
+      }
+      tapTimer = setTimeout(() => { tapTimer = null; uiOverlay.classList.contains("ctrl-on") ? hideControls() : showControls(); }, 260);
+    });
+
+    gid("lp-share").addEventListener("click", () => { gid("lp-modal").classList.remove("open"); gid("btn-share").click(); });
+    gid("lp-save").addEventListener("click", async () => {
+      gid("lp-modal").classList.remove("open");
+      const v = videos[currentIndex];
+      interact(v, 4);
+      try {
+        const blob = await (await fetch(v.src)).blob();
+        const name = v.username + "-" + v.id + "." + (blob.type.includes("webm") ? "webm" : "mp4");
+        const file = new File([blob], name, { type: blob.type || "video/mp4" });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          try { await navigator.share({ files: [file] }); return; } // iPhone: choose "Save Video"
+          catch (err) { if (err && err.name === "AbortError") return; }
+        }
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = name;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      } catch (err) {
+        alert(LANG === "en" ? "Could not save the video" : "לא ניתן לשמור את הסרטון");
+      }
+    });
+
+    // ===== Hold to fast-forward / rewind, speed reset, caption, follow, share sheet =====
+    Object.assign(EN, { "שתף ל…": "Share to…", "אימייל": "Email", "הודעה": "Message", "העתק קישור": "Copy link", "עוד": "More", "לייקים": "Likes" });
+    let holdTimer = null, holdSide = null;
+    function startHold(side) {
+      const v = curVid();
+      if (!v) return;
+      holdSide = side;
+      const b = gid("hold-badge");
+      b.textContent = side === "right" ? "2x ▶▶" : "◀◀ 2x";
+      b.classList.add("show");
+      if (side === "right") { v.playbackRate = 2; if (v.paused) v.play().catch(() => {}); }
+      else {
+        v.pause();
+        const lo = bounds(v)[0];
+        holdTimer = setInterval(() => { v.currentTime = Math.max(lo, v.currentTime - 0.1); if (v.currentTime <= lo) endHold(); }, 50);
+      }
+    }
+    function endHold() {
+      if (!holdSide) return;
+      const side = holdSide, v = curVid();
+      holdSide = null;
+      clearInterval(holdTimer); holdTimer = null;
+      gid("hold-badge").classList.remove("show");
+      if (v) { applySpeed(v, currentIndex); if (side === "left") v.play().catch(() => {}); }
+    }
+    function resetSpeed() {
+      userSpeed = null;
+      speedMenu.querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset.s === "1"));
+    }
+
+    // description: 3 lines + inline bold "More" (no black box, last word trimmed so no overlap)
+    let capKey = null, capExpanded = false;
+    function renderCollapsedCaption(v) {
+      const full = fullCaption(v);
+      const wrap = gid("cap-wrap");
+      wrap.classList.remove("expanded");
+      renderCaption(infoCaption, full);
+      const lh = parseFloat(getComputedStyle(infoCaption).lineHeight) || 19;
+      const maxH = lh * 3.15;
+      if (infoCaption.scrollHeight <= maxH) return;
+
+      const tokens = full.split(/(\s+)/);
+      let lo = 1, hi = tokens.length, best = 1;
+      const makeMore = () => {
+        const b = document.createElement("button");
+        b.id = "cap-more";
+        b.type = "button";
+        b.textContent = "More";
+        b.onclick = (e) => { e.stopPropagation(); capExpanded = true; renderExpandedCaption(v); };
+        return b;
+      };
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        const slice = tokens.slice(0, mid).join("").replace(/\s+$/, "");
+        renderCaption(infoCaption, slice);
+        infoCaption.appendChild(makeMore());
+        if (infoCaption.scrollHeight <= maxH) { best = mid; lo = mid + 1; }
+        else { hi = mid - 1; }
+      }
+      // Trim one extra word at the end of line 3 so "More" sits cleanly with breathing room
+      let trimmed = tokens.slice(0, best).join("").replace(/\s+$/, "");
+      trimmed = trimmed.replace(/\s+\S+$/, "");
+      renderCaption(infoCaption, trimmed);
+      infoCaption.appendChild(makeMore());
+    }
+    function renderExpandedCaption(v) {
+      const wrap = gid("cap-wrap");
+      wrap.classList.add("expanded");
+      renderCaption(infoCaption, fullCaption(v));
+      const b = document.createElement("button");
+      b.id = "cap-less";
+      b.type = "button";
+      b.textContent = "Less";
+      b.onclick = (e) => { e.stopPropagation(); capExpanded = false; renderCollapsedCaption(v); };
+      infoCaption.appendChild(b);
+    }
+    function syncCaption(v) {
+      const key = v.id + "_" + (v.date || 0);
+      if (capKey === key) return;
+      capKey = key;
+      capExpanded = false;
+      requestAnimationFrame(() => renderCollapsedCaption(v));
+    }
+    ["touchstart", "touchend", "mousedown", "mouseup"].forEach(t => gid("cap-wrap").addEventListener(t, e => e.stopPropagation()));
+
+    // description limit: 1000 words
+    gid("cr-caption").addEventListener("input", (e) => {
+      let toks = e.target.value.trim().split(/\s+/).filter(Boolean);
+      const isTag = t => t[0] === "#";
+      let words = toks.filter(t => !isTag(t)).length, tags = toks.filter(isTag).length;
+      if (words > 1000 || tags > 10) {
+        let w = 0, g = 0;
+        toks = toks.filter(t => isTag(t) ? ++g <= 10 : ++w <= 1000);
+        e.target.value = toks.join(" ");
+        words = Math.min(words, 1000); tags = Math.min(tags, 10);
+      }
+      gid("cr-wc").textContent = words + "/1000 • #" + tags + "/10";
+    });
+
+    // follow
+    const followed = new Set();
+    gid("btn-follow").addEventListener("click", () => {
+      const u = videos[currentIndex].username;
+      if (followed.has(u)) followed.delete(u); else { followed.add(u); interact(videos[currentIndex], 4); }
+      updateUI();
+    });
+
+    // share sheet
+    function openShare() {
+      const v = videos[currentIndex];
+      const url = window.location.href, text = v.caption.slice(0, 120) + " – " + v.username;
+      const u = encodeURIComponent(url), t = encodeURIComponent(text);
+      const apps = [
+        ["WhatsApp", "#25D366", "W", `https://wa.me/?text=${t}%20${u}`],
+        ["Telegram", "#229ED9", "T", `https://t.me/share/url?url=${u}&text=${t}`],
+        ["Facebook", "#1877F2", "f", `https://www.facebook.com/sharer/sharer.php?u=${u}`],
+        ["Messenger", "#A334FA", "M", `fb-messenger://share/?link=${u}`],
+        ["X", "#000", "X", `https://twitter.com/intent/tweet?text=${t}&url=${u}`],
+        ["LinkedIn", "#0A66C2", "in", `https://www.linkedin.com/sharing/share-offsite/?url=${u}`],
+        ["Reddit", "#FF4500", "R", `https://www.reddit.com/submit?url=${u}&title=${t}`],
+        ["Pinterest", "#E60023", "P", `https://pinterest.com/pin/create/button/?url=${u}&description=${t}`],
+        ["אימייל", "#6b7280", "✉️", `mailto:?subject=${t}&body=${t}%0A${u}`],
+        ["הודעה", "#34c759", "💬", `sms:?&body=${t}%20${u}`]
+      ];
+      const modal = gid("share-modal"), grid = gid("share-grid");
+      grid.innerHTML = "";
+      const item = (el, label, color, icon) => {
+        el.className = "share-item";
+        el.innerHTML = '<span class="share-ic"></span><span></span>';
+        el.firstChild.style.background = color;
+        el.firstChild.textContent = icon;
+        el.lastChild.textContent = label;
+        grid.appendChild(el);
+        return el;
+      };
+      apps.forEach(([label, color, icon, href]) => {
+        const a = document.createElement("a");
+        a.href = href; a.target = "_blank"; a.rel = "noopener";
+        item(a, label, color, icon).addEventListener("click", () => modal.classList.remove("open"));
+      });
+      item(document.createElement("button"), "העתק קישור", "#3a3a45", "🔗").onclick = async () => {
+        try { await navigator.clipboard.writeText(text + "\n" + url); alert("הקישור הועתק ללוח"); } catch (e) {}
+        modal.classList.remove("open");
+      };
+      if (navigator.share) {
+        // the system sheet also reaches Instagram, TikTok, Snapchat and every other installed app
+        item(document.createElement("button"), "עוד", "#3a3a45", "⋯").onclick = async () => {
+          modal.classList.remove("open");
+          try { await navigator.share({ title: "UploadVid", text, url }); } catch (e) {}
+        };
+      }
+      modal.classList.add("open");
+    }
+
+    // ===== Hashtag rendering, sound page, report =====
+    Object.assign(EN, { "סאונד": "Sound", "🚩 דווח על סרטון": "🚩 Report video", "דווח על סרטון": "Report video", "מה הבעיה בסרטון?": "What's wrong with this video?", "שלח דיווח": "Send report" });
+    function renderCaption(el, text) {
+      el.textContent = "";
+      text.split(/(#[^\s#]+)/).forEach(part => {
+        if (!part) return;
+        if (part[0] === "#") { const t = document.createElement("span"); t.className = "tag"; t.textContent = part; el.appendChild(t); }
+        else el.appendChild(document.createTextNode(part));
+      });
+    }
+
+    const soundPanel = gid("sound-panel");
+    function openSound() {
+      hideControls();
+      const cur = videos[currentIndex];
+      const list = videos.filter(x => x.soundId === cur.soundId).sort((a, b) => (b.orig ? 1 : 0) - (a.orig ? 1 : 0) || b.likes - a.likes);
+      const orig = list.find(x => x.orig) || cur;
+      gid("sound-title").textContent = (LANG === "en" ? "Original sound – " : "סאונד מקורי – ") + orig.username;
+      gid("sound-sub").textContent = list.length + (LANG === "en" ? " videos" : " סרטונים");
+      const grid = gid("sound-grid");
+      grid.innerHTML = "";
+      list.forEach(v => {
+        const c = document.createElement("div");
+        c.className = "sound-cell";
+        if (v.type === "photos") {
+          const im = document.createElement("img");
+          im.onerror = () => { im.onerror = null; im.src = photoFallback(0); }; im.src = v.images[0]; im.alt = ""; im.style.cssText = "width:100%;height:100%;object-fit:cover";
+          c.appendChild(im);
+        } else {
+          const vid = document.createElement("video");
+          vid.src = v.src + "#t=0.5"; vid.muted = true; vid.playsInline = true; vid.preload = "metadata";
+          c.appendChild(vid);
+        }
+        if (v.orig) { const t = document.createElement("div"); t.className = "orig-tag"; t.textContent = "OriginalUploader"; c.appendChild(t); }
+        const l = document.createElement("div");
+        l.className = "sound-likes"; l.textContent = "♥ " + formatCount(v.likes);
+        c.appendChild(l);
+        c.onclick = () => { closeSound(); const i = videos.indexOf(v); goTo(i, i > currentIndex ? "up" : "down"); };
+        grid.appendChild(c);
+      });
+      soundPanel.classList.add("open");
+    }
+    function closeSound() { soundPanel.classList.remove("open"); gid("sound-grid").innerHTML = ""; }
+    gid("btn-sound").addEventListener("click", (e) => { e.stopPropagation(); interact(videos[currentIndex], 3); openSound(); });
+    gid("close-sound").addEventListener("click", closeSound);
+    ["touchstart", "touchend", "mousedown", "mouseup"].forEach(t => gid("btn-sound").addEventListener(t, e => e.stopPropagation()));
+
+    // LIVE button inside my profile
+    gid("btn-live-mp").addEventListener("click", () => gid("btn-live").click());
+
+    // report a video (owner email gets added later; until then reports are only kept in memory)
+    const REPORT_EMAIL = ""; // TODO: owner's email
+    const reports = [];
+    gid("lp-report").addEventListener("click", () => {
+      gid("lp-modal").classList.remove("open");
+      gid("report-text").value = "";
+      gid("report-modal").classList.add("open");
+    });
+    gid("report-send").addEventListener("click", () => {
+      const text = gid("report-text").value.trim();
+      if (!text) return;
+      const v = videos[currentIndex];
+      const r = { video: v.id, user: v.username, caption: v.caption.slice(0, 100), text, at: new Date().toISOString() };
+      reports.push(r);
+      gid("report-modal").classList.remove("open");
+      if (REPORT_EMAIL) {
+        const a = document.createElement("a");
+        a.href = "mailto:" + REPORT_EMAIL + "?subject=" + encodeURIComponent("Video report - @" + r.user) +
+          "&body=" + encodeURIComponent("Video: " + r.video + " (@" + r.user + ")\nCaption: " + r.caption + "\n\n" + text);
+        a.click();
+        alert(LANG === "en" ? "Your report is ready to send by email." : "הדיווח מוכן לשליחה במייל.");
+      } else {
+        alert(LANG === "en" ? "Report saved. It will be emailed to the owner once the address is added." : "הדיווח נשמר. הוא יישלח למייל של הבעלים אחרי שהכתובת תתווסף.");
+      }
+    });
+
+    // swipe right = back to the previous page
+    function swipeBack(el, fn, allowLeft) {
+      let x0 = 0, y0 = 0;
+      el.addEventListener("touchstart", (e) => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+      el.addEventListener("touchend", (e) => {
+        const t = e.changedTouches[0];
+        const dx = t.clientX - x0, dy = Math.abs(t.clientY - y0);
+        if (dx > 70 && dy < 60) fn();
+        else if (allowLeft && dx < -70 && dy < 60 && !profileMe) fn();
+      }, { passive: true });
+    }
+    swipeBack(gid("profile-panel"), closeProfile, true);
+    swipeBack(gid("sound-panel"), closeSound);
+    swipeBack(gid("inbox-panel"), closeInbox);
+    swipeBack(gid("live-panel"), closeLive);
+
+    // ===== Swipe right = back (profile / MP, sound page, DM, inbox, comments, popups) =====
+    Object.assign(EN, {
+      "צלם נוף 📷": "Landscape photographer 📷", "צילום רחוב": "Street photography", "שמש וים ☀️": "Sun and sea ☀️", "שחור לבן": "Black & white",
+      "פרחים ויופי 🌸": "Flowers and beauty 🌸", "עיר ואורות 🌃": "City lights 🌃", "טבע 🌲": "Nature 🌲", "קפה ומאפים ☕": "Coffee and pastries ☕",
+      "שמיים 🌤️": "Skies 🌤️", "וינטג׳ 📼": "Vintage 📼", "וואו איזה רכב!": "Wow, what a car!", "קלאסיקה אמיתית 😍": "A real classic 😍",
+      "איזה סרטון מדהים": "What an amazing video", "תודה על השיתוף": "Thanks for sharing", "אהבתי את הסאונד": "Loved the sound"
+    });
+    function refreshLang() {
+      if (inboxPanel.classList.contains("open")) renderInbox();
+      if (soundPanel.classList.contains("open")) openSound();
+      if (histPanel.classList.contains("open")) renderHistory();
+    }
+    function goBack() {
+      const modal = document.querySelector(".modal.open");
+      if (modal) modal.classList.remove("open");
+      else if (dmOpen) closeDM();
+      else if (inboxPanel.classList.contains("open")) closeInbox();
+      else if (histPanel.classList.contains("open")) closeHistory();
+      else if (soundPanel.classList.contains("open")) closeSound();
+      else if (profileOpen) closeProfile();
+      else if (commentsOpen) closeComments();
+    }
+    let bx = 0, by = 0, bTrack = false;
+    const backStart = (x, y) => { bx = x; by = y; bTrack = gesturesBlocked(); };
+    const backEnd = (x, y) => {
+      if (!bTrack) return;
+      bTrack = false;
+      const dx = x - bx, dy = y - by;
+      if (dx > 70 && dx > Math.abs(dy) * 1.5) {
+        if (livePanel.classList.contains("open")) closeLive();
+        else goBack();
+      } else if (dx < -70 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+        // Swiping left again when viewing the uploader's profile returns to the previous page
+        if (profileOpen && !profileMe && !dmOpen && !inboxPanel.classList.contains("open")) {
+          closeProfile();
+        }
+      }
+    };
+    app.addEventListener("touchstart", (e) => backStart(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
+    app.addEventListener("touchend", (e) => backEnd(e.changedTouches[0].clientX, e.changedTouches[0].clientY), { passive: true });
+    app.addEventListener("mousedown", (e) => backStart(e.clientX, e.clientY));
+    app.addEventListener("mouseup", (e) => backEnd(e.clientX, e.clientY));
+
+    // ===== Recommendation algorithm =====
+    Object.assign(EN, {
+      "🔄 רענן": "🔄 Refresh", "🕘 היסטוריית צפייה": "🕘 History watch", "היסטוריית צפייה": "History watch", "תפריט": "Menu",
+      "חיפוש בהיסטוריה": "Search history", "חפש בהיסטוריית הצפייה...": "Search watch history...", "לא נמצאו תוצאות": "No results", "עדיין לא צפית בסרטונים": "No videos watched yet"
+    });
+    const DAY = 864e5;
+    const LS = {
+      get(k, d) { try { return JSON.parse(localStorage.getItem(k)) || d; } catch (e) { return d; } },
+      set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+    };
+    const interest = LS.get("uv_interest", { tags: {}, words: {}, sounds: {}, topics: {} });
+    let history = LS.get("uv_hist", []); // [{id, t}] newest first
+    const fmtDate = (ts) => { const d = new Date(ts); return d.getDate() + "." + (d.getMonth() + 1) + "." + d.getFullYear() + " " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); };
+    const fullCaption = (v) => (v.caption || "") + (v.date ? " (" + fmtDate(v.date) + ")" : "");
+
+    function features(v) {
+      if (!v._f || v._fc !== v.caption) {
+        const text = v.caption || "";
+        v._f = {
+          tags: (text.match(/#[^\s#]+/g) || []).map(t => t.toLowerCase()),
+          words: [...new Set(text.replace(/#[^\s#]+/g, " ").toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(w => w.length >= 3))].slice(0, 80)
+        };
+        v._fc = v.caption;
+      }
+      return v._f;
+    }
+    function score(v) {
+      const f = features(v);
+      let sc = 0;
+      f.tags.forEach(t => { sc += interest.tags[t] || 0; });
+      f.words.forEach(w => { sc += 0.3 * (interest.words[w] || 0); });
+      return sc + 2 * (interest.sounds[v.soundId] || 0) + 3 * (interest.topics[v.topic] || 0);
+    }
+    // a like, a share, a save, a visit to the sound page, a comment, a follow or 10+ seconds of watching teaches the feed
+    function interact(v, w) {
+      const f = features(v), add = (o, k) => { o[k] = (o[k] || 0) + w; };
+      f.tags.forEach(t => add(interest.tags, t));
+      f.words.forEach(x => add(interest.words, x));
+      if (v.soundId) add(interest.sounds, v.soundId);
+      if (v.topic) add(interest.topics, v.topic);
+      LS.set("uv_interest", interest);
+      reorderUpcoming();
+    }
+    function reorderUpcoming() {
+      const start = currentIndex + 1, up = videos.slice(start);
+      if (up.length < 2) return;
+      const sorted = up.map((v, i) => ({ v, i, s: score(v) })).sort((a, b) => b.s - a.s || a.i - b.i).map(x => x.v);
+      if (sorted.every((v, i) => v === up[i])) return;
+      const byId = new Map([...container.querySelectorAll(".video-slide")].map(el => [el.dataset.vid, el]));
+      videos.splice(start, up.length, ...sorted);
+      sorted.forEach(v => container.appendChild(byId.get(String(v.id))));
+      container.querySelectorAll(".video-slide").forEach((el, i) => { el.dataset.index = i; });
+    }
+
+    // watch time + history (90 days)
+    let watchId = null, watchSec = 0;
+    function recordView(v) {
+      history = history.filter(h => h.id !== v.id && h.t > Date.now() - 90 * DAY);
+      history.unshift({ id: v.id, t: Date.now() });
+      LS.set("uv_hist", history);
+    }
+    setInterval(() => {
+      if (document.hidden || livePanel.classList.contains("open") || histPanel.classList.contains("open") || soundPanel.classList.contains("open")) return;
+      const v = videos[currentIndex];
+      if (!v) return;
+      if (watchId !== v.id) { watchId = v.id; watchSec = 0; }
+      watchSec++;
+      if (watchSec === 2) recordView(v);
+      if (watchSec === 10 && !v.liked) interact(v, 2);
+    }, 1000);
+
+    // ===== Menu: refresh + watch history =====
+    const menuPop = gid("menu-pop"), histPanel = gid("hist-panel");
+    gid("btn-menu").addEventListener("click", (e) => { e.stopPropagation(); menuPop.classList.toggle("open"); });
+    document.addEventListener("click", (e) => { if (!e.target.closest("#menu-pop")) menuPop.classList.remove("open"); });
+
+    gid("menu-refresh").addEventListener("click", () => {
+      menuPop.classList.remove("open");
+      const seen = new Set(history.map(h => h.id));
+      const ranked = videos.map(v => ({ v, s: score(v) + (seen.has(v.id) ? -4 : 0) + ((v.date || 0) - Date.now()) / DAY * 0.2 + Math.random() * 2 }))
+        .sort((a, b) => b.s - a.s).map(x => x.v);
+      videos.splice(0, videos.length, ...ranked); // personalised, unseen and recent first
+      watchId = null;
+      rebuildFeed();
+    });
+
+    function renderHistory() {
+      const q = gid("hist-q").value.trim().toLowerCase(), grid = gid("hist-grid");
+      history = history.filter(h => h.t > Date.now() - 90 * DAY);
+      const list = history.map(h => videos.find(v => v.id === h.id)).filter(Boolean)
+        .filter(v => !q || v.username.toLowerCase().includes(q) || features(v).tags.join(" ").includes(q) || (v.caption || "").slice(0, 200).toLowerCase().includes(q));
+      gid("hist-sub").textContent = LANG === "en" ? "Last 90 days" : "90 הימים האחרונים";
+      grid.innerHTML = "";
+      if (!list.length) { const m = document.createElement("div"); m.className = "hist-empty"; m.textContent = q ? "לא נמצאו תוצאות" : "עדיין לא צפית בסרטונים"; grid.appendChild(m); return; }
+      list.forEach(v => {
+        const c = document.createElement("div");
+        c.className = "sound-cell";
+        if (v.type === "photos") { const im = document.createElement("img"); im.onerror = () => { im.onerror = null; im.src = photoFallback(0); }; im.src = v.images[0]; im.alt = ""; c.appendChild(im); }
+        else { const vid = document.createElement("video"); vid.src = v.src + "#t=0.5"; vid.muted = true; vid.playsInline = true; vid.preload = "metadata"; c.appendChild(vid); }
+        const l = document.createElement("div");
+        l.className = "sound-likes"; l.textContent = "@" + v.username;
+        c.appendChild(l);
+        c.onclick = () => { closeHistory(); const i = videos.indexOf(v); goTo(i, i > currentIndex ? "up" : "down"); };
+        grid.appendChild(c);
+      });
+    }
+    function openHistory() { menuPop.classList.remove("open"); hideControls(); gid("hist-q").hidden = true; gid("hist-q").value = ""; renderHistory(); histPanel.classList.add("open"); }
+    function closeHistory() { histPanel.classList.remove("open"); gid("hist-grid").innerHTML = ""; }
+    gid("menu-history").addEventListener("click", openHistory);
+    gid("close-hist").addEventListener("click", closeHistory);
+    gid("hist-search-btn").addEventListener("click", () => { const q = gid("hist-q"); q.hidden = !q.hidden; if (!q.hidden) q.focus(); });
+    gid("hist-q").addEventListener("input", renderHistory);
+
+    // ===== Captions (per video, off until the user taps CC) =====
+    const CAP = {
+      en: ["Welcome to the show room", "Look at this beautiful classic car", "The engine sounds amazing", "Let's take it for a drive", "Perfect for a weekend trip", "Subscribe for more videos"],
+      he: ["ברוכים הבאים לתצוגה", "תראו את המכונית הקלאסית הזאת", "המנוע נשמע מדהים", "בואו ניקח אותה לנסיעה", "מושלמת לטיול סוף שבוע", "הירשמו לעוד סרטונים"],
+      ru: ["Добро пожаловать в автосалон", "Посмотрите на этот красивый классический автомобиль", "Двигатель звучит потрясающе", "Давайте прокатимся", "Идеально для поездки на выходные", "Подписывайтесь на новые видео"],
+      es: ["Bienvenidos a la exhibición", "Miren este hermoso coche clásico", "El motor suena increíble", "Vamos a dar una vuelta", "Perfecto para un viaje de fin de semana", "Suscríbete para más videos"],
+      fr: ["Bienvenue dans la salle d'exposition", "Regardez cette belle voiture classique", "Le moteur sonne incroyablement bien", "Faisons un tour", "Parfait pour un week-end", "Abonnez-vous pour plus de vidéos"]
+    };
+    function updateCaptions() {
+      const v = videos[currentIndex], el = gid("live-cap"), vid = curVid();
+      if (!v || !vid || !v.capOn || v.type === "photos") { el.hidden = true; return; }
+      const lang = v.capLang || LANG, cues = CAP[lang] || CAP.en;
+      el.lang = lang;
+      el.dir = lang === "he" ? "rtl" : "ltr";
+      el.textContent = cues[Math.floor(vid.currentTime / 4) % cues.length];
+      el.hidden = false;
+    }
+    setInterval(updateCaptions, 300);
+    gid("btn-cc").addEventListener("click", (e) => {
+      e.stopPropagation();
+      const v = videos[currentIndex];
+      v.capOn = !v.capOn;
+      gid("btn-cc").classList.toggle("on", v.capOn);
+      updateCaptions();
+      keepControls();
+    });
+
+    // photo posts: page dots (centered above the description) and a gradient for photos that fail to load
+    function renderDots(v) {
+      const el = gid("photo-dots");
+      if (v.type !== "photos") { el.hidden = true; return; }
+      el.hidden = false;
+      el.innerHTML = v.images.map((_, j) => '<span' + (j === (v.photoIdx || 0) ? ' class="on"' : '') + '></span>').join("");
+    }
+    function photoFallback(j) {
+      const c = ["#1e3a5f", "#5b21b6", "#065f46"][j % 3];
+      return "data:image/svg+xml;utf8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 1280"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + c + '"/><stop offset="1" stop-color="#0b0b10"/></linearGradient></defs><rect width="720" height="1280" fill="url(#g)"/></svg>');
+    }
+
+    // Keyboard for testing
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape" && e.target.matches && e.target.matches("input, textarea")) return;
+      if (e.key === "ArrowUp") nextVideo();
+      if (e.key === "ArrowDown") prevVideo();
+      if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        if (!gesturesBlocked()) openProfile();
+        else if (e.key === "ArrowRight") {
+          if (livePanel.classList.contains("open")) closeLive();
+          else goBack();
+        } else if (e.key === "ArrowLeft" && profileOpen && !profileMe) {
+          closeProfile();
+        }
+      }
+      if (e.key === "Escape") {
+        closeComments();
+        closeProfile();
+        closeDM();
+        closeLive();
+        document.querySelectorAll(".modal").forEach(m => m.classList.remove("open"));
+      }
+    });
+
+    // Simple comment send (local only)
+    document.getElementById("send-comment").addEventListener("click", () => {
+      const input = document.getElementById("comment-input");
+      const text = input.value.trim();
+      if (!text) return;
+      const v = videos[currentIndex];
+      v.comments.push({
+        user: "you",
+        text: text,
+        avatar: makeAvatar("you", "#2dd4bf")
+      });
+      input.value = "";
+      interact(v, 3);
+      updateUI();
+    });
+
+    // Search: jump to the first video matching a username or caption
+    function runSearch() {
+      const q = document.getElementById("search-input").value.trim().toLowerCase();
+      if (!q) return;
+      const i = videos.findIndex(v => v.username.toLowerCase().includes(q) || v.caption.toLowerCase().includes(q));
+      if (i < 0) { alert(LANG === "en" ? "No results" : "לא נמצאו תוצאות"); return; }
+      document.getElementById("search-modal").classList.remove("open");
+      goTo(i);
+    }
+    document.querySelector("#search-modal .modal-box button").addEventListener("click", runSearch);
+    document.getElementById("search-input").addEventListener("keydown", (e) => { if (e.key === "Enter") runSearch(); });
+
+    // Init
+    initVideos();
+    applyLang(LANG);
+
+    // Enable sound after the first interaction (browser autoplay policy)
+    const enableSound = () => {
+      if (soundOn) return;
+      soundOn = true;
+      const vid = document.querySelector(".video-slide.active video");
+      if (vid) setMute(vid, currentIndex);
+    };
+    ["click", "touchend"].forEach(t => app.addEventListener(t, enableSound));
+  </script>
+</body>
+</html>
